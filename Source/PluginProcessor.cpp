@@ -10,9 +10,23 @@ CosmicRaysAudioProcessor::CosmicRaysAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+       apvts (*this, nullptr, "Parameters", createParameterLayout())
 #endif
 {
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "ACTIVITY", 1 }, "Activity", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SHAPE", 1 }, "Shape", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FILTER", 1 }, "Filter", 20.0f, 20000.0f, 20000.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MIX", 1 }, "Mix", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "ALGO", 1 }, "Algorithm", juce::StringArray { "Mosaic", "Glitch", "Warp", "Ghost" }, 0));
+
+    return { params.begin(), params.end() };
 }
 
 CosmicRaysAudioProcessor::~CosmicRaysAudioProcessor() {}
@@ -70,7 +84,21 @@ void CosmicRaysAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 bool CosmicRaysAudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* CosmicRaysAudioProcessor::createEditor() { return new CosmicRaysAudioProcessorEditor (*this); }
 
-void CosmicRaysAudioProcessor::getStateInformation (juce::MemoryBlock& destData) {}
-void CosmicRaysAudioProcessor::setStateInformation (const void* data, int sizeInBytes) {}
+void CosmicRaysAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
+}
+
+void CosmicRaysAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+}
+
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new CosmicRaysAudioProcessor(); }
