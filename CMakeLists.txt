@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(CosmicRays VERSION 0.0.1 LANGUAGES CXX)
+project(CosmicRays VERSION 0.0.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,7 +9,7 @@ include(FetchContent)
 FetchContent_Declare(
     juce
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG 7.0.12 # Or specify a stable version
+    GIT_TAG 8.0.6 # Update for macOS 15 support
 )
 FetchContent_MakeAvailable(juce)
 
