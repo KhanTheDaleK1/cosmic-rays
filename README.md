@@ -1,6 +1,6 @@
 # Cosmic Rays
 
-Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that emulates the granular synthesis and glitch effects of the Hologram Microcosm pedal. It features a high-density granular engine with tape-style delay, rhythmic sequencing, and dynamic pattern generation.
+Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that provides advanced granular synthesis and glitch effects. It features a high-density granular engine with tape-style delay, rhythmic sequencing, and dynamic pattern generation.
 
 **Version:** Beta (March 2, 2026)
 
@@ -11,7 +11,7 @@ Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that em
   - *Glitch*: Blocks, Interrupt, Arp
   - *Multidelay*: Pattern, Warp
 - **Advanced Granular Engine**: Dynamic envelope shaping (Sine, Tri, Saw, Square, Rand), pitch modulation, rhythmic quantizing, and reverse capabilities.
-- **Microcosm-Style DSP**: Integrated Reverb and analog-style Ladder Filter (logarithmic LPF/HPF).
+- **Hardware-Style DSP**: Integrated Reverb and analog-style Ladder Filter (logarithmic LPF/HPF).
 - **Phase Looper Controls**: Reverse playback and Quantize (locks triggers to the tempo grid).
 - **UI**: Modern teal/grey responsive interface with Tap Tempo LED and multi-function parameter mappings (Shift controls).
 - **Cross-Platform**: Support for AU, VST3, and LV2 formats.

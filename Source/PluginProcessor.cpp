@@ -22,7 +22,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Microcosm Category & Algorithm Selection
+    // Category & Algorithm Selection
     juce::StringArray algos;
     algos.add("Mosaic (Micro Loop)"); algos.add("Seq (Micro Loop)"); algos.add("Glide (Micro Loop)");
     algos.add("Haze (Granules)"); algos.add("Tunnel (Granules)"); algos.add("Strum (Granules)");

@@ -47,7 +47,7 @@ private:
     bool isPlaying = false;
     bool isReverse = false;
 
-    // Microcosm-style DSP
+    // Hardware-style DSP
     juce::dsp::ProcessorChain<juce::dsp::LadderFilter<float>, juce::dsp::Reverb> fxChain;
     juce::dsp::LadderFilterMode currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
 

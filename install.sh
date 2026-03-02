@@ -69,5 +69,5 @@ elif [ "$OS" == "Darwin" ]; then
     cp -r CosmicRays_artefacts/Release/VST3/Cosmic\ Rays.vst3 "$VST3_PATH/"
     
     echo "Cosmic Rays installation complete!"
-    echo "You may need to restart your DAW (e.g., GarageBand, Logic) to see the plugin."
+    echo "You may need to restart your DAW to see the plugin."
 fi
