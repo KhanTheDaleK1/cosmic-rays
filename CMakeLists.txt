@@ -25,6 +25,7 @@ juce_add_plugin(CosmicRays
     PLUGIN_CODE "COSR"
     FORMATS AU VST3 LV2
     PRODUCT_NAME "Cosmic Rays"
+    LV2URI "https://beechen.site/plugins/cosmic-rays"
 )
 
 target_sources(CosmicRays
@@ -58,3 +59,12 @@ target_link_libraries(CosmicRays
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags
 )
+
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0)
+    pkg_check_modules(WEBKIT REQUIRED webkit2gtk-4.1)
+    
+    target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT_INCLUDE_DIRS})
+    target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES} ${WEBKIT_LIBRARIES})
+endif()

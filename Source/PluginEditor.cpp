@@ -4,7 +4,7 @@
 CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioProcessor& p)
     : AudioProcessorEditor (&p), processor (p)
 {
-    auto knobColor = juce::Colour::grey (0.8f);
+    auto knobColor = juce::Colours::grey;
     auto accentColor = juce::Colours::teal;
 
     auto setupKnob = [&](juce::Slider& s, juce::Label& l, const juce::String& name) {
