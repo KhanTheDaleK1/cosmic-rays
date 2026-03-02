@@ -22,21 +22,44 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Granular Synthesis Macros (Fragments / Portal style)
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GRAIN_SIZE", 1 }, "Grain Size", 10.0f, 500.0f, 100.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "DENSITY", 1 }, "Density", 1.0f, 100.0f, 20.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "PITCH", 1 }, "Pitch", -24.0f, 24.0f, 0.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SPRAY", 1 }, "Pan Spray", 0.0f, 1.0f, 0.5f));
+    // Microcosm Category & Algorithm Selection
+    juce::StringArray algos;
+    algos.add("Mosaic (Micro Loop)"); algos.add("Seq (Micro Loop)"); algos.add("Glide (Micro Loop)");
+    algos.add("Haze (Granules)"); algos.add("Tunnel (Granules)"); algos.add("Strum (Granules)");
+    algos.add("Blocks (Glitch)"); algos.add("Interrupt (Glitch)"); algos.add("Arp (Glitch)");
+    algos.add("Pattern (Multidelay)"); algos.add("Warp (Multidelay)");
+    
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "ALGO", 1 }, "Algorithm", algos, 0));
 
-    // Delay & Tape Simulation (Other Desert Cities / Replicas style)
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "DELAY_TIME", 1 }, "Delay Time", 1.0f, 2000.0f, 250.0f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FEEDBACK", 1 }, "Feedback", 0.0f, 1.5f, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FLUTTER", 1 }, "Tape Flutter", 0.0f, 1.0f, 0.1f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "REVERSE", 1 }, "Reverse Prob", 0.0f, 1.0f, 0.2f));
-
-    // Master Output & Routing
+    // Main Knobs (Primary)
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "ACTIVITY", 1 }, "Activity", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "TIME", 1 }, "Time", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SHAPE", 1 }, "Shape", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "REPEATS", 1 }, "Repeats", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FILTER", 1 }, "Filter", 0.0f, 1.0f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SPACE", 1 }, "Space", 0.0f, 1.0f, 0.3f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MIX", 1 }, "Mix", 0.0f, 1.0f, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "ALGO", 1 }, "Algorithm", juce::StringArray { "Mosaic", "Glitch", "Warp", "Ghost" }, 0));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "LOOP_LEVEL", 1 }, "Loop Level", 0.0f, 1.0f, 0.8f));
+
+    // Secondary Controls (Accessed via Shift)
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "RESONANCE", 1 }, "Resonance", 0.0f, 1.0f, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MOD_RATE", 1 }, "Mod Rate", 0.1f, 10.0f, 1.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MOD_DEPTH", 1 }, "Mod Depth", 0.0f, 1.0f, 0.2f));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "SPACE_MODE", 1 }, "Space Mode", juce::StringArray {"Room", "Hall", "Ambient", "Wash"}, 0));
+
+    // Logic & Toggles
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "TEMPO_MODE", 1 }, "Tempo Mode", false));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "SUBDIV", 1 }, "Subdivision", 
+        juce::StringArray {"1/1", "1/2", "1/4", "1/8", "1/16"}, 2));
+    
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GAIN", 1 }, "Master Gain", 0.0f, 2.0f, 1.0f));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "PRESET", 1 }, "Preset", juce::StringArray {"1", "2", "3", "4"}, 0));
+
+    // Phase Looper Controls
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "LOOPER_MODE", 1 }, "Looper Mode", 
+        juce::StringArray { "Pre-FX", "Looper Only", "Burst" }, 0));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_QUANT", 1 }, "Quantize", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_REV", 1 }, "Reverse", false));
 
     return { params.begin(), params.end() };
 }

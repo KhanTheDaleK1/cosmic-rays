@@ -1,16 +1,27 @@
 # Cosmic Rays
 
-Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that emulates the granular synthesis and glitch effects of the Hologram Microcosm pedal. It features a high-density granular engine with tape-style delay and stochastic pattern generation.
+Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that emulates the granular synthesis and glitch effects of the Hologram Microcosm pedal. It features a high-density granular engine with tape-style delay, rhythmic sequencing, and dynamic pattern generation.
 
-## Current Features
-- **Granular Synthesis Engine**: Stochastic grain scheduler with density, size, pitch, and spray controls.
-- **Tape Delay Simulation**: Integrated feedback loop with tape flutter and reverse probability.
-- **Multiple Algorithms**: Mosaic, Glitch, Warp, and Ghost modes for diverse sonic textures.
-- **Cross-Platform**: Support for AU, VST3, and LV2 formats on macOS and Linux.
-- **UI**: Modern teal/grey interface with responsive controls.
+**Version:** Beta (March 2, 2026)
 
-## Build Instructions
+## Features
+- **11 Unique Algorithms**:
+  - *Micro Loop*: Mosaic, Seq, Glide
+  - *Granules*: Haze, Tunnel, Strum
+  - *Glitch*: Blocks, Interrupt, Arp
+  - *Multidelay*: Pattern, Warp
+- **Advanced Granular Engine**: Dynamic envelope shaping (Sine, Tri, Saw, Square, Rand), pitch modulation, rhythmic quantizing, and reverse capabilities.
+- **Microcosm-Style DSP**: Integrated Reverb and analog-style Ladder Filter (logarithmic LPF/HPF).
+- **Phase Looper Controls**: Reverse playback and Quantize (locks triggers to the tempo grid).
+- **UI**: Modern teal/grey responsive interface with Tap Tempo LED and multi-function parameter mappings (Shift controls).
+- **Cross-Platform**: Support for AU, VST3, and LV2 formats.
 
+## Quick Installation
+Download the release `.zip` file.
+- **macOS**: Extract the zip and double-click the `Install_CosmicRays.app` for a 1-click terminal-free installation.
+- **Linux**: Extract and double-click the included `.desktop` or `install.sh` file.
+
+## Build Instructions (For Source)
 ### Prerequisites
 - CMake (3.15 or later)
 - C++17 compiler (GCC/Clang)
@@ -22,9 +33,6 @@ mkdir build && cd build
 cmake ..
 cmake --build .
 ```
-
-## Installation
-Use the provided `install.sh` script for a 1-click installation on macOS or Linux.
 
 ## License
 MIT

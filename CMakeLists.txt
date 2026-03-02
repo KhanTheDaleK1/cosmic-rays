@@ -54,6 +54,7 @@ target_link_libraries(CosmicRays
     juce::juce_graphics
     juce::juce_events
     juce::juce_core
+    juce::juce_dsp
     PUBLIC
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags

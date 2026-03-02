@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
 #include <vector>
 #include <random>
 
@@ -9,6 +10,7 @@ struct Grain {
     float speed = 1.0f;
     float pan = 0.5f;
     float age = 0.0f;
+    int windowType = 0; // 0: Sine, 1: Tri, 2: Saw, 3: Square, 4: Rand
     bool active = false;
     bool reverse = false;
 };
@@ -21,7 +23,7 @@ public:
 
 private:
     float getNextSample(int channel, float readPos);
-    void scheduleGrains(float density, float sizeMs, float pitch, float reverseProb, float spray);
+    void scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, juce::AudioProcessorValueTreeState& apvts);
 
     double fs = 44100.0;
     juce::AudioBuffer<float> delayBuffer;
@@ -31,4 +33,28 @@ private:
     std::vector<Grain> grains;
     std::mt19937 rng;
     std::uniform_real_distribution<float> dist;
+    
+    // Algorithm & Rhythm State
+    float grainClock = 0.0f;
+    int stepCount = 0;
+
+    // Phase Looper State
+    juce::AudioBuffer<float> loopBuffer;
+    int loopWritePos = 0;
+    int loopReadPos = 0;
+    int loopLength = 0;
+    bool isRecording = false;
+    bool isPlaying = false;
+    bool isReverse = false;
+
+    // Microcosm-style DSP
+    juce::dsp::ProcessorChain<juce::dsp::LadderFilter<float>, juce::dsp::Reverb> fxChain;
+    juce::dsp::LadderFilterMode currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
+
+    // Smoothed Parameters
+    juce::LinearSmoothedValue<float> smoothActivity, smoothTime, smoothShape, smoothRepeats, smoothFilter, smoothSpace, smoothMix, smoothGain, smoothLoopLevel;
+
+    // DC Blocker State
+    float dcBlockerX_L = 0.0f, dcBlockerY_L = 0.0f;
+    float dcBlockerX_R = 0.0f, dcBlockerY_R = 0.0f;
 };
