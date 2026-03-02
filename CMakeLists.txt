@@ -33,6 +33,8 @@ target_sources(CosmicRays
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/GranularEngine.cpp
+    Source/GranularEngine.h
 )
 
 target_compile_definitions(CosmicRays

@@ -16,20 +16,30 @@ CosmicRaysAudioProcessor::CosmicRaysAudioProcessor()
 {
 }
 
+CosmicRaysAudioProcessor::~CosmicRaysAudioProcessor() {}
+
 juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "ACTIVITY", 1 }, "Activity", 0.0f, 1.0f, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SHAPE", 1 }, "Shape", 0.0f, 1.0f, 0.5f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FILTER", 1 }, "Filter", 20.0f, 20000.0f, 20000.0f));
+    // Granular Synthesis Macros (Fragments / Portal style)
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GRAIN_SIZE", 1 }, "Grain Size", 10.0f, 500.0f, 100.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "DENSITY", 1 }, "Density", 1.0f, 100.0f, 20.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "PITCH", 1 }, "Pitch", -24.0f, 24.0f, 0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SPRAY", 1 }, "Pan Spray", 0.0f, 1.0f, 0.5f));
+
+    // Delay & Tape Simulation (Other Desert Cities / Replicas style)
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "DELAY_TIME", 1 }, "Delay Time", 1.0f, 2000.0f, 250.0f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FEEDBACK", 1 }, "Feedback", 0.0f, 1.5f, 0.5f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "FLUTTER", 1 }, "Tape Flutter", 0.0f, 1.0f, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "REVERSE", 1 }, "Reverse Prob", 0.0f, 1.0f, 0.2f));
+
+    // Master Output & Routing
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MIX", 1 }, "Mix", 0.0f, 1.0f, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "ALGO", 1 }, "Algorithm", juce::StringArray { "Mosaic", "Glitch", "Warp", "Ghost" }, 0));
 
     return { params.begin(), params.end() };
 }
-
-CosmicRaysAudioProcessor::~CosmicRaysAudioProcessor() {}
 
 const juce::String CosmicRaysAudioProcessor::getName() const { return JucePlugin_Name; }
 
@@ -44,7 +54,11 @@ void CosmicRaysAudioProcessor::setCurrentProgram (int index) {}
 const juce::String CosmicRaysAudioProcessor::getProgramName (int index) { return {}; }
 void CosmicRaysAudioProcessor::changeProgramName (int index, const juce::String& newName) {}
 
-void CosmicRaysAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {}
+void CosmicRaysAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
+    int numChannels = getTotalNumInputChannels() > 0 ? getTotalNumInputChannels() : 2;
+    granularEngine.prepare(sampleRate, samplesPerBlock, numChannels);
+}
+
 void CosmicRaysAudioProcessor::releaseResources() {}
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -77,8 +91,7 @@ void CosmicRaysAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // Main Granular / Delay logic would go here.
-    // For now, it's just a pass-through.
+    granularEngine.processBlock(buffer, apvts);
 }
 
 bool CosmicRaysAudioProcessor::hasEditor() const { return true; }
@@ -99,6 +112,5 @@ void CosmicRaysAudioProcessor::setStateInformation (const void* data, int sizeIn
         if (xmlState->hasTagName (apvts.state.getType()))
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
-
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new CosmicRaysAudioProcessor(); }
