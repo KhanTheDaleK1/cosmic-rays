@@ -17,7 +17,11 @@ Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that pr
 - **Cross-Platform**: Support for AU, VST3, and LV2 formats.
 
 ## Quick Installation
-Download the release `.zip` file.
+
+[![Download Cosmic Rays Beta](https://img.shields.io/badge/DOWNLOAD-Cosmic%20Rays%20Beta%20(macOS%20%26%20Linux)-009DDC?style=for-the-badge&logo=github)](https://github.com/KhanTheDaleK1/cosmic-rays/raw/main/CosmicRays_Beta_3-3-2026.zip)
+
+*Windows installer coming soon.*
+
 - **macOS**: Extract the zip and double-click the `Install_CosmicRays.app` for a 1-click terminal-free installation.
 - **Linux**: Extract and double-click the included `.desktop` or `install.sh` file.
 
