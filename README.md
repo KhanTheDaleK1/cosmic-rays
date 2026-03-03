@@ -2,7 +2,7 @@
 
 Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that provides advanced granular synthesis and glitch effects. It features a high-density granular engine with tape-style delay, rhythmic sequencing, and dynamic pattern generation.
 
-**Version:** Beta (March 2, 2026)
+**Version:** Beta (March 3, 2026)
 
 ## Features
 - **11 Unique Algorithms**:

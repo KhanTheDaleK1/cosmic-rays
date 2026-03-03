@@ -318,7 +318,7 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
     g.setColour (juce::Colour (0xFF222222)); g.setFont (juce::Font ("Helvetica", 30.0f, juce::Font::bold));
     g.drawFittedText ("COSMIC RAYS", headerArea.withTrimmedLeft(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredLeft, 1);
     g.setFont (juce::Font ("Courier", 12.0f, juce::Font::plain));
-    g.drawFittedText ("BETA 3-2-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
+    g.drawFittedText ("BETA 3-3-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
     g.setColour(juce::Colour(0xFF444444)); g.setFont(juce::Font("Courier", 10.0f, juce::Font::bold));
     g.drawText("SYNC", shiftButton.getX(), shiftButton.getY() - 10, 50, 10, juce::Justification::centred);
     g.drawText("BEAT", tapButton.getX(), tapButton.getY() - 10, 50, 10, juce::Justification::centred);
