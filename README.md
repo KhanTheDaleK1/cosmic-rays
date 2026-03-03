@@ -23,6 +23,7 @@ Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that pr
 *Windows installer coming soon.*
 
 - **macOS**: Extract the zip and double-click the `Install_CosmicRays.app` for a 1-click terminal-free installation.
+  - *Note for macOS users:* If you see a message saying the app "cannot be opened because it is from an unidentified developer," go to **System Settings > Privacy & Security**, scroll down to the "Security" section, and click **"Open Anyway"**.
 - **Linux**: Extract and double-click the included `.desktop` or `install.sh` file.
 
 ## Build Instructions (For Source)
