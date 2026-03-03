@@ -11,7 +11,8 @@ CosmicRaysAudioProcessor::CosmicRaysAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-       apvts (*this, nullptr, "Parameters", createParameterLayout())
+       apvts (*this, nullptr, "Parameters", createParameterLayout()),
+       visualiser(1)
 #endif
 {
 }
@@ -24,14 +25,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
 
     // Category & Algorithm Selection
     juce::StringArray algos;
-    algos.add("Mosaic (Micro Loop)"); algos.add("Seq (Micro Loop)"); algos.add("Glide (Micro Loop)");
-    algos.add("Haze (Granules)"); algos.add("Tunnel (Granules)"); algos.add("Strum (Granules)");
-    algos.add("Blocks (Glitch)"); algos.add("Interrupt (Glitch)"); algos.add("Arp (Glitch)");
-    algos.add("Pattern (Multidelay)"); algos.add("Warp (Multidelay)");
+    algos.add("Mosaic"); algos.add("Seq"); algos.add("Glide");
+    algos.add("Haze"); algos.add("Tunnel"); algos.add("Strum");
+    algos.add("Blocks"); algos.add("Interrupt"); algos.add("Arp");
+    algos.add("Pattern"); algos.add("Warp");
     
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "ALGO", 1 }, "Algorithm", algos, 0));
 
-    // Main Knobs (Primary)
+    // Main Knobs
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "ACTIVITY", 1 }, "Activity", 0.0f, 1.0f, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "TIME", 1 }, "Time", 0.0f, 1.0f, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SHAPE", 1 }, "Shape", 0.0f, 1.0f, 0.5f));
@@ -41,23 +42,37 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MIX", 1 }, "Mix", 0.0f, 1.0f, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "LOOP_LEVEL", 1 }, "Loop Level", 0.0f, 1.0f, 0.8f));
 
-    // Secondary Controls (Accessed via Shift)
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "RESONANCE", 1 }, "Resonance", 0.0f, 1.0f, 0.1f));
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MOD_RATE", 1 }, "Mod Rate", 0.1f, 10.0f, 1.0f));
+    // Modulation Section (Wow & Flutter)
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MOD_RATE", 1 }, "Mod Rate", 0.1f, 10.0f, 0.5f));
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MOD_DEPTH", 1 }, "Mod Depth", 0.0f, 1.0f, 0.2f));
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "SPACE_MODE", 1 }, "Space Mode", juce::StringArray {"Room", "Hall", "Ambient", "Wash"}, 0));
 
-    // Logic & Toggles
-    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "TEMPO_MODE", 1 }, "Tempo Mode", false));
+    // Global Modes
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "KILL_DRY", 1 }, "Kill Dry", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "TRAILS", 1 }, "Trails", true));
+
+    // Advanced Controls
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "RESONANCE", 1 }, "Resonance", 0.0f, 1.0f, 0.1f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "PITCH_DRIFT", 1 }, "Pitch Drift", 0.0f, 1.0f, 0.2f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SNAP_STRENGTH", 1 }, "Rhythmic Snap", 0.0f, 1.0f, 0.5f));
+
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "TEMPO_MODE", 1 }, "Tempo Sync", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "FREEZE", 1 }, "Freeze/Sustain", false));
+    
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "SUBDIV", 1 }, "Subdivision", 
         juce::StringArray {"1/1", "1/2", "1/4", "1/8", "1/16"}, 2));
     
-    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GAIN", 1 }, "Master Gain", 0.0f, 2.0f, 1.0f));
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "PRESET", 1 }, "Preset", juce::StringArray {"1", "2", "3", "4"}, 0));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GAIN", 1 }, "Output Gain", 0.0f, 2.0f, 1.0f));
+    
+    // 16 Presets (4 banks of 4)
+    juce::StringArray presets;
+    for (int b = 1; b <= 4; ++b) for (int s = 1; s <= 4; ++s) presets.add ("Bank " + juce::String(b) + " - " + juce::String(s));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "PRESET", 1 }, "Preset", presets, 0));
 
     // Phase Looper Controls
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "LOOPER_MODE", 1 }, "Looper Mode", 
-        juce::StringArray { "Pre-FX", "Looper Only", "Burst" }, 0));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "LOOPER_MODE", 1 }, "Looper Routing", 
+        juce::StringArray { "Pre-FX", "Post-FX" }, 0));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_REC", 1 }, "Looper Record", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_ODUB", 1 }, "Looper Overdub", false));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_QUANT", 1 }, "Quantize", false));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_REV", 1 }, "Reverse", false));
 
@@ -80,6 +95,7 @@ void CosmicRaysAudioProcessor::changeProgramName (int index, const juce::String&
 void CosmicRaysAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
     int numChannels = getTotalNumInputChannels() > 0 ? getTotalNumInputChannels() : 2;
     granularEngine.prepare(sampleRate, samplesPerBlock, numChannels);
+    visualiser.clear();
 }
 
 void CosmicRaysAudioProcessor::releaseResources() {}
@@ -115,6 +131,7 @@ void CosmicRaysAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         buffer.clear (i, 0, buffer.getNumSamples());
 
     granularEngine.processBlock(buffer, apvts);
+    visualiser.pushBuffer(buffer);
 }
 
 bool CosmicRaysAudioProcessor::hasEditor() const { return true; }

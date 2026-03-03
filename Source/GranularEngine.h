@@ -7,7 +7,8 @@
 struct Grain {
     float currentPos = 0.0f;
     float length = 0.0f;
-    float speed = 1.0f;
+    float startSpeed = 1.0f;
+    float endSpeed = 1.0f;
     float pan = 0.5f;
     float age = 0.0f;
     int windowType = 0; // 0: Sine, 1: Tri, 2: Saw, 3: Square, 4: Rand
@@ -43,16 +44,25 @@ private:
     int loopWritePos = 0;
     int loopReadPos = 0;
     int loopLength = 0;
-    bool isRecording = false;
-    bool isPlaying = false;
-    bool isReverse = false;
+    bool isOverdubbing = false;
+
+    // Wow & Flutter / Modulation
+    float modPhase = 0.0f;
+    float modRate = 0.5f;
+    float modDepth = 0.1f;
+
+    // Global Modes
+    bool killDry = false;
+    bool trailsEnabled = true;
+    float bypassVolume = 1.0f;
 
     // Hardware-style DSP
-    juce::dsp::ProcessorChain<juce::dsp::LadderFilter<float>, juce::dsp::Reverb> fxChain;
+    juce::dsp::ProcessorChain<juce::dsp::LadderFilter<float>, juce::dsp::Reverb, juce::dsp::Chorus<float>> fxChain;
     juce::dsp::LadderFilterMode currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
 
     // Smoothed Parameters
     juce::LinearSmoothedValue<float> smoothActivity, smoothTime, smoothShape, smoothRepeats, smoothFilter, smoothSpace, smoothMix, smoothGain, smoothLoopLevel;
+    juce::LinearSmoothedValue<float> smoothDrift, smoothSnap;
 
     // DC Blocker State
     float dcBlockerX_L = 0.0f, dcBlockerY_L = 0.0f;

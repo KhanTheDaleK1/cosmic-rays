@@ -15,8 +15,17 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
     fxChain.prepare(spec);
     
-    currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
+    currentFilterMode = juce::dsp::LadderFilterMode::LPF12;
     fxChain.get<0>().setMode(currentFilterMode);
+    
+    // Reverb for Hall character
+    auto& reverb = fxChain.get<1>();
+    juce::dsp::Reverb::Parameters revParams;
+    revParams.roomSize = 0.85f;
+    revParams.damping = 0.4f;
+    revParams.width = 1.0f;
+    revParams.freezeMode = 0.0f;
+    reverb.setParameters(revParams);
 
     smoothActivity.reset(sampleRate, 0.05);
     smoothTime.reset(sampleRate, 0.05);
@@ -27,11 +36,13 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     smoothMix.reset(sampleRate, 0.05);
     smoothGain.reset(sampleRate, 0.05);
     smoothLoopLevel.reset(sampleRate, 0.05);
+    smoothDrift.reset(sampleRate, 0.05);
+    smoothSnap.reset(sampleRate, 0.05);
 
-    loopBuffer.setSize(numChannels, (int)(sampleRate * 30.0)); // 30 second loop max
+    loopBuffer.setSize(numChannels, (int)(sampleRate * 60.0)); // 60 second looper
     loopBuffer.clear();
     loopWritePos = 0; loopReadPos = 0; loopLength = 0;
-    isRecording = false; isPlaying = false;
+    isOverdubbing = false;
 
     dcBlockerX_L = 0.0f; dcBlockerY_L = 0.0f;
     dcBlockerX_R = 0.0f; dcBlockerY_R = 0.0f;
@@ -51,9 +62,10 @@ float GranularEngine::getNextSample(int channel, float readPos) {
 void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, juce::AudioProcessorValueTreeState& apvts) {
     bool globalRev = apvts.getRawParameterValue("LOOPER_REV")->load() > 0.5f;
     bool globalQuant = apvts.getRawParameterValue("LOOPER_QUANT")->load() > 0.5f;
+    float drift = apvts.getRawParameterValue("PITCH_DRIFT")->load();
+    float snap = apvts.getRawParameterValue("SNAP_STRENGTH")->load();
 
-    // Clock-based scheduling for rhythmic algos
-    float samplesPerStep = (timeMs * (float)fs / 1000.0f) * 0.25f; // 16th note default
+    float samplesPerStep = (timeMs * (float)fs / 1000.0f) * 0.25f; 
     if (samplesPerStep < 100.0f) samplesPerStep = 100.0f;
     
     grainClock += 1.0f;
@@ -64,98 +76,90 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         isStep = true;
     }
 
-    // Trigger Logic
     bool trigger = false;
-    float prob = 0.001f + (activity * 0.05f);
+    float prob = 0.002f + (activity * 0.08f);
 
-    if (globalQuant) {
-        trigger = isStep && (dist(rng) < activity);
+    if (globalQuant || (dist(rng) < snap)) {
+        trigger = isStep && (dist(rng) < activity + 0.15f);
     } else {
         switch (algo) {
-            case 0: // Mosaic: Random micro-loops
-                trigger = (dist(rng) < prob); break;
-            case 1: // Seq: Rhythmic stepping
-            case 2: // Glide: Smooth pitch shifting
-                trigger = isStep && (dist(rng) < activity); break;
-            case 3: // Haze: Random micro-textures
-            case 4: // Tunnel: Reverb-like grains
-                trigger = (dist(rng) < prob * 0.5f); break;
-            case 5: // Strum: Burst arpeggiation
-                trigger = isStep && (stepCount % 4 == 0) && (dist(rng) < activity); break;
-            case 6: // Blocks: Gated rhythm
-            case 7: // Interrupt: Glitchy bursts
-                trigger = isStep && (dist(rng) < activity); break;
-            case 8: // Arp: Pitch arpeggiation
-                trigger = isStep && (dist(rng) < activity); break;
-            case 9: // Pattern: Multi-tap
-            case 10: // Warp: Speed warping
-                trigger = isStep && (stepCount % 2 == 0); break;
+            case 0: case 3: case 4: trigger = (dist(rng) < prob); break;
+            default: trigger = isStep && (dist(rng) < activity + 0.05f); break;
         }
     }
 
     if (!trigger) return;
 
-    for (auto& g : grains) {
-        if (!g.active) {
-            g.active = true; g.age = 0.0f; g.speed = 1.0f; 
-            g.reverse = globalRev; // Respect global reverse
+    int spawnCount = (algo == 0 || algo == 3) ? (int)(1 + activity * 2.0f) : 1;
+    
+    for (int s = 0; s < spawnCount; ++s) {
+        for (auto& g : grains) {
+            if (!g.active) {
+                g.active = true; g.age = 0.0f; 
+                g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+                g.reverse = globalRev;
 
-            // Algorithm Behaviors
-            switch (algo) {
-                case 1: // Seq
-                    g.speed = (stepCount % 4 == 0) ? 2.0f : 1.0f; break;
-                case 2: // Glide
-                    g.speed = 0.5f + (shape * 1.5f); break;
-                case 3: // Haze
-                    g.speed = (dist(rng) < 0.2f) ? 0.5f : (dist(rng) > 0.8f ? 2.0f : 1.0f);
-                    g.speed += (dist(rng) * 2.0f - 1.0f) * shape * 0.2f; break;
-                case 4: // Tunnel
-                    g.speed = 0.5f; break;
-                case 5: // Strum
-                    g.speed = 1.0f + (float)(stepCount % 8) * 0.125f; break;
-                case 6: // Blocks
-                    g.reverse = globalRev ? (stepCount % 4 != 0) : (stepCount % 4 == 0); break;
-                case 7: // Interrupt
-                    if (!globalRev) g.reverse = (dist(rng) < 0.5f);
-                    g.speed = (dist(rng) < 0.1f) ? 4.0f : 1.0f; break;
-                case 8: // Arp
-                    {
-                        float notes[] = { 1.0f, 1.25f, 1.5f, 1.875f, 2.0f }; // Major scale steps
-                        g.speed = notes[stepCount % 5];
-                    } break;
-                case 9: // Pattern
-                    g.speed = 1.0f; break;
-                case 10: // Warp
-                    g.speed = 1.0f + std::sin((float)stepCount * 0.5f) * shape; break;
+                if (algo == 0) { // Mosaic
+                    float octs[] = { 0.5f, 1.0f, 2.0f, 1.5f };
+                    g.startSpeed = octs[(int)(dist(rng) * 4.0f)];
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 1) { // Seq
+                    g.startSpeed = (stepCount % 4 == 0) ? 2.0f : (stepCount % 3 == 0 ? 0.5f : 1.0f);
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 2) { // Glide
+                    g.startSpeed = 1.0f; g.endSpeed = 0.5f + (shape * 1.5f);
+                } else if (algo == 3) { // Haze
+                    g.startSpeed = 1.0f + (dist(rng) * 2.0f - 1.0f) * shape * 0.5f;
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 4) { // Tunnel
+                    g.startSpeed = 0.5f; g.endSpeed = 0.5f;
+                } else if (algo == 5) { // Strum
+                    g.startSpeed = 1.0f + (float)(stepCount % 6) * 0.2f;
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 6) { // Blocks
+                    g.reverse = (stepCount % 4 == 0) ? !globalRev : globalRev;
+                } else if (algo == 7) { // Interrupt
+                    if (dist(rng) < activity) g.startSpeed = (dist(rng) < 0.5f) ? 4.0f : 0.25f;
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 8) { // Arp
+                    float notes[] = { 1.0f, 1.25f, 1.5f, 1.875f, 2.0f };
+                    g.startSpeed = notes[stepCount % 5];
+                    g.endSpeed = g.startSpeed;
+                } else if (algo == 9) { // Pattern
+                    g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+                } else if (algo == 10) { // Warp
+                    g.startSpeed = 1.0f + std::sin((float)stepCount * 0.8f) * shape;
+                    g.endSpeed = 1.0f - std::sin((float)stepCount * 0.8f) * shape;
+                }
+
+                if (drift > 0.05f) {
+                    float d = (dist(rng) * 2.0f - 1.0f) * drift * 0.2f;
+                    g.startSpeed += d; g.endSpeed += d;
+                }
+
+                float lenBase = timeMs * ((float)fs / 1000.0f);
+                if (algo >= 3 && algo <= 5) g.length = lenBase * (1.0f + shape * 2.0f);
+                else if (algo >= 9) g.length = lenBase * 0.5f;
+                else g.length = lenBase * (0.2f + shape * 0.8f);
+
+                if (g.length < 100.0f) g.length = 100.0f;
+
+                float maxOffset = (float)fs * (0.2f + activity * 3.0f);
+                float offset = dist(rng) * maxOffset;
+                if (algo == 4) offset = (float)fs * 0.5f;
+                else if (algo == 9) offset = (float)(stepCount % 4) * samplesPerStep * 2.0f;
+
+                g.currentPos = (float)currentWriteIdx - offset;
+                while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples;
+                while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+
+                g.pan = dist(rng);
+                if (shape < 0.25f) g.windowType = 0;
+                else if (shape < 0.5f) g.windowType = 1;
+                else if (shape < 0.75f) g.windowType = 2;
+                else g.windowType = 3;
+                break;
             }
-
-            // Length logic
-            switch (algo) {
-                case 0: g.length = timeMs * (0.2f + shape * 0.8f) * ((float)fs / 1000.0f); break;
-                case 3: case 4: g.length = (100.0f + dist(rng) * 1000.0f * shape) * ((float)fs / 1000.0f); break;
-                case 9: g.length = (timeMs * 0.5f) * ((float)fs / 1000.0f); break;
-                default: g.length = (timeMs * 0.25f) * ((float)fs / 1000.0f); break;
-            }
-            if (g.length < 50.0f) g.length = 50.0f;
-
-            // Positioning
-            float offset = (0.01f + dist(rng) * 0.99f) * (float)fs * (0.1f + activity * 2.0f);
-            if (algo == 9) offset = (float)(stepCount % 4) * samplesPerStep; 
-
-            g.currentPos = (float)currentWriteIdx - offset;
-            while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples;
-            while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
-
-            g.pan = dist(rng);
-            
-            // Assign window type based on shape knob (honoring the UI labels)
-            if (shape < 0.2f) g.windowType = 0; // Sine
-            else if (shape < 0.4f) g.windowType = 1; // Tri
-            else if (shape < 0.6f) g.windowType = 2; // Saw
-            else if (shape < 0.8f) g.windowType = 3; // Square
-            else g.windowType = (int)(dist(rng) * 4.0f); // Random
-            
-            break;
         }
     }
 }
@@ -164,7 +168,6 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     int numSamples = buffer.getNumSamples();
     int numChannels = buffer.getNumChannels();
 
-    // Sync Targets
     smoothActivity.setTargetValue(apvts.getRawParameterValue("ACTIVITY")->load());
     smoothTime.setTargetValue(apvts.getRawParameterValue("TIME")->load());
     smoothShape.setTargetValue(apvts.getRawParameterValue("SHAPE")->load());
@@ -177,134 +180,123 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
 
     int algo = (int)apvts.getRawParameterValue("ALGO")->load();
     bool tempoMode = apvts.getRawParameterValue("TEMPO_MODE")->load() > 0.5f;
-    float resonance = apvts.getRawParameterValue("RESONANCE")->load();
+    bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
+    bool killDry = apvts.getRawParameterValue("KILL_DRY")->load() > 0.5f;
+    bool isLooperPost = ((int)apvts.getRawParameterValue("LOOPER_MODE")->load()) == 1;
+    bool isRecording = apvts.getRawParameterValue("LOOPER_REC")->load() > 0.5f;
+    bool isOverdubbing = apvts.getRawParameterValue("LOOPER_ODUB")->load() > 0.5f;
+
+    float modRate = apvts.getRawParameterValue("MOD_RATE")->load();
+    float modDepth = apvts.getRawParameterValue("MOD_DEPTH")->load();
 
     juce::AudioBuffer<float> wetBuffer(numChannels, numSamples);
     wetBuffer.clear();
 
-    // Process Reverb/Filter Parameters Once Per Block
-    float filterKnob = smoothFilter.getNextValue(); // Grab start-of-block value
+    // FX Param Update
+    float filterKnob = smoothFilter.getNextValue(); 
     auto& filter = fxChain.get<0>();
-    filter.setResonance(juce::jlimit(0.0f, 0.90f, resonance * 0.85f));
+    filter.setResonance(juce::jlimit(0.0f, 0.90f, (float)apvts.getRawParameterValue("RESONANCE")->load() * 0.85f));
     
     if (filterKnob < 0.45f) {
-        if (currentFilterMode != juce::dsp::LadderFilterMode::LPF24) {
-            currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
-            filter.setMode(currentFilterMode);
-            filter.reset(); // Prevent pops
+        if (currentFilterMode != juce::dsp::LadderFilterMode::LPF12) {
+            currentFilterMode = juce::dsp::LadderFilterMode::LPF12;
+            filter.setMode(currentFilterMode); filter.reset();
         }
-        float logCutoff = juce::mapToLog10(juce::jlimit(0.001f, 1.0f, filterKnob / 0.45f), 40.0f, 20000.0f);
-        filter.setCutoffFrequencyHz(logCutoff);
+        filter.setCutoffFrequencyHz(juce::mapToLog10(juce::jlimit(0.001f, 1.0f, filterKnob / 0.45f), 40.0f, 20000.0f));
     } else if (filterKnob > 0.55f) {
-        if (currentFilterMode != juce::dsp::LadderFilterMode::HPF24) {
-            currentFilterMode = juce::dsp::LadderFilterMode::HPF24;
-            filter.setMode(currentFilterMode);
-            filter.reset(); // Prevent pops
+        if (currentFilterMode != juce::dsp::LadderFilterMode::HPF12) {
+            currentFilterMode = juce::dsp::LadderFilterMode::HPF12;
+            filter.setMode(currentFilterMode); filter.reset();
         }
-        float logCutoff = juce::mapToLog10(juce::jlimit(0.001f, 1.0f, (filterKnob - 0.55f) / 0.45f), 20.0f, 18000.0f);
-        filter.setCutoffFrequencyHz(logCutoff);
+        filter.setCutoffFrequencyHz(juce::mapToLog10(juce::jlimit(0.001f, 1.0f, (filterKnob - 0.55f) / 0.45f), 20.0f, 18000.0f));
     } else {
-        if (currentFilterMode != juce::dsp::LadderFilterMode::LPF24) {
-            currentFilterMode = juce::dsp::LadderFilterMode::LPF24;
-            filter.setMode(currentFilterMode);
-            filter.reset();
-        }
-        filter.setCutoffFrequencyHz(20000.0f); // Basically bypassed
+        filter.setCutoffFrequencyHz(20000.0f);
     }
 
     float spaceVal = smoothSpace.getNextValue();
-    fxChain.get<1>().setParameters({spaceVal * 0.8f, 0.5f, spaceVal * 0.5f, 1.0f, 1.0f, 0.0f});
-    
-    // Fast-forward the block-level smoothers so they reach target
-    smoothFilter.skip(numSamples - 1);
-    smoothSpace.skip(numSamples - 1);
+    fxChain.get<1>().setParameters({spaceVal * 0.9f, 0.4f, spaceVal * 0.6f, 1.0f, 1.0f, 0.0f});
 
     for (int i = 0; i < numSamples; ++i) {
         float timeVal = smoothTime.getNextValue();
         float effectiveTimeMs = 250.0f;
-        if (tempoMode) {
-            float bpm = 40.0f + (timeVal * 200.0f);
-            effectiveTimeMs = 60000.0f / bpm; 
-        } else {
-            int subdiv = (int)apvts.getRawParameterValue("SUBDIV")->load();
+        if (tempoMode) effectiveTimeMs = 60000.0f / (40.0f + (timeVal * 200.0f));
+        else {
             float factors[] = { 1.0f, 0.5f, 0.25f, 0.125f, 0.0625f };
-            effectiveTimeMs = 1000.0f * factors[juce::jlimit(0, 4, subdiv)]; 
+            effectiveTimeMs = 1000.0f * factors[juce::jlimit(0, 4, (int)apvts.getRawParameterValue("SUBDIV")->load())];
         }
 
-        int currentWriteIdx = (writeIdx + i) % maxDelaySamples;
-        scheduleGrains(smoothActivity.getNextValue(), effectiveTimeMs, smoothShape.getNextValue(), algo, currentWriteIdx, apvts);
+        // Wow & Flutter modulation
+        modPhase += (modRate / (float)fs);
+        if (modPhase >= 1.0f) modPhase -= 1.0f;
+        float modLFO = std::sin(juce::MathConstants<float>::twoPi * modPhase) * modDepth * 0.02f;
+
+        scheduleGrains(smoothActivity.getNextValue(), effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, apvts);
         
         for (auto& g : grains) {
             if (g.active) {
                 float phase = g.age / g.length;
                 float window = 0.0f;
-
-                // Dynamic Windowing (Envelope Shaping)
                 switch (g.windowType) {
-                    case 0: // Sine (Hann)
-                        window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase)); break;
-                    case 1: // Triangle
-                        window = 1.0f - std::abs(2.0f * phase - 1.0f); break;
-                    case 2: // Saw
-                        window = 1.0f - phase; break;
-                    case 3: // Square-ish (Trapezoid)
-                        window = phase < 0.1f ? (phase * 10.0f) : (phase > 0.9f ? (1.0f - phase) * 10.0f : 1.0f); break;
-                    default: // Random selection
-                        window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase)); break;
+                    case 0: window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase)); break;
+                    case 1: window = 1.0f - std::abs(2.0f * phase - 1.0f); break;
+                    case 2: window = 1.0f - phase; break;
+                    case 3: window = phase < 0.05f ? (phase * 20.0f) : (phase > 0.95f ? (1.0f - phase) * 20.0f : 1.0f); break;
                 }
                 
                 float sL = getNextSample(0, g.currentPos) * window;
                 float sR = getNextSample(numChannels > 1 ? 1 : 0, g.currentPos) * window;
                 
-                wetBuffer.addSample(0, i, sL * (1.0f - g.pan) * 0.8f);
-                if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan * 0.8f);
+                wetBuffer.addSample(0, i, sL * (1.0f - g.pan));
+                if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan);
                 
-                float actualSpeed = g.reverse ? -g.speed : g.speed;
+                float curSpeed = (g.startSpeed + (g.endSpeed - g.startSpeed) * phase) + modLFO;
+                float actualSpeed = g.reverse ? -curSpeed : curSpeed;
                 g.currentPos += actualSpeed;
                 if (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
                 if (g.currentPos < 0) g.currentPos += (float)maxDelaySamples;
-
                 if (++g.age >= g.length) g.active = false;
             }
         }
     }
 
-    // Process FX chain on the wet signal
-    juce::dsp::AudioBlock<float> block(wetBuffer);
-    fxChain.process(juce::dsp::ProcessContextReplacing<float>(block));
+    juce::dsp::AudioBlock<float> wetBlock(wetBuffer);
+    fxChain.process(juce::dsp::ProcessContextReplacing<float>(wetBlock));
 
-    // Feedback loop and Mixing
     for (int i = 0; i < numSamples; ++i) {
-        float mix = smoothMix.getNextValue();
-        float gain = smoothGain.getNextValue();
-        float repeats = smoothRepeats.getNextValue();
+        float mix = smoothMix.getNextValue(), gain = smoothGain.getNextValue(), repeats = smoothRepeats.getNextValue();
+        float loopLevel = smoothLoopLevel.getNextValue();
 
         for (int ch = 0; ch < numChannels; ++ch) {
             float dry = buffer.getSample(ch, i);
             float wet = wetBuffer.getSample(ch, i);
             
-            if (!std::isfinite(wet)) wet = 0.0f;
-            wet = juce::jlimit(-2.0f, 2.0f, wet); // Hard safety clipper
+            float loopOut = (loopLength > 0) ? loopBuffer.getSample(ch, loopReadPos) : 0.0f;
+            float looperInput = isLooperPost ? (dry * (1.0f - mix) + wet * mix) : dry;
+            
+            if (isRecording) loopBuffer.setSample(ch, loopWritePos, looperInput);
+            else if (isOverdubbing) loopBuffer.setSample(ch, loopWritePos, loopBuffer.getSample(ch, loopWritePos) + looperInput * 0.6f);
 
-            // Correct 1-pole Highpass DC Blocker for feedback
             float prevX = (ch == 0) ? dcBlockerX_L : dcBlockerX_R;
             float prevY = (ch == 0) ? dcBlockerY_L : dcBlockerY_R;
             float dcBlockedWet = wet - prevX + 0.995f * prevY;
-            
             if (ch == 0) { dcBlockerX_L = wet; dcBlockerY_L = dcBlockedWet; }
             else         { dcBlockerX_R = wet; dcBlockerY_R = dcBlockedWet; }
             
-            // Limit feedback to prevent total explosion
-            float fbSignal = juce::jlimit(-1.5f, 1.5f, dcBlockedWet * repeats * 0.8f);
+            float fbSignal = juce::jlimit(-1.5f, 1.5f, dcBlockedWet * repeats * 0.85f);
+            if (!freeze) delayBuffer.setSample(ch, writeIdx, std::tanh(dry + fbSignal));
 
-            // Update delay buffer with input + safe feedback
-            float writeVal = dry + fbSignal;
-            delayBuffer.setSample(ch, writeIdx, std::tanh(writeVal));
-
-            // Final Output Mix
-            float out = (dry * (1.0f - mix)) + (wet * mix);
+            float finalWet = wet + (loopOut * loopLevel);
+            float out = ((killDry ? 0.0f : dry) * (1.0f - mix)) + (finalWet * mix);
             buffer.setSample(ch, i, std::tanh(out * gain));
         }
-        writeIdx = (writeIdx + 1) % maxDelaySamples;
+        
+        loopReadPos = (loopReadPos + 1) % juce::jmax(1, loopLength);
+        if (isRecording) {
+            loopWritePos++;
+            if (loopWritePos >= loopBuffer.getNumSamples()) loopWritePos = 0;
+            loopLength = juce::jmax(loopLength, loopWritePos);
+        } else loopWritePos = (loopWritePos + 1) % juce::jmax(1, loopLength);
+
+        if (!freeze) writeIdx = (writeIdx + 1) % maxDelaySamples;
     }
 }
