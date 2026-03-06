@@ -122,7 +122,7 @@ private:
                                      smoothLoopLevel, smoothDrift, smoothSnap, 
                                      smoothMasterWetVol, smoothLoopFade, smoothSpray, 
                                      smoothSpread, smoothEnvFollower, smoothPitchJitter, 
-                                     smoothRevProb;
+                                     smoothRevProb, smoothModRate, smoothModDepth;
 
     // --- DC Offset Prevention ---
     float dcBlockerX_L = 0.0f, dcBlockerY_L = 0.0f;

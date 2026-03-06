@@ -1,7 +1,7 @@
 /**
  * COSMIC RAYS - Granular Engine Implementation (Refined 3-6-2026)
  * ------------------------------------------------------------
- * Robust kinematic granular synthesis with global MDL pitch modulation.
+ * Professional granular engine with Kinematic Motion and Global MDL.
  */
 
 #include "GranularEngine.h"
@@ -45,7 +45,7 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     fxChain.get<0>().setMode(currentFilterMode);
     fxChain.get<2>().setMix(0.0f); 
 
-    for (auto* s : {&smoothActivity, &smoothTime, &smoothShape, &smoothRepeats, &smoothFilter, &smoothSpace, &smoothMix, &smoothGain, &smoothLoopLevel, &smoothDrift, &smoothSnap, &smoothMasterWetVol, &smoothLoopFade, &smoothSpray, &smoothSpread, &smoothEnvFollower, &smoothPitchJitter, &smoothRevProb}) {
+    for (auto* s : {&smoothActivity, &smoothTime, &smoothShape, &smoothRepeats, &smoothFilter, &smoothSpace, &smoothMix, &smoothGain, &smoothLoopLevel, &smoothDrift, &smoothSnap, &smoothMasterWetVol, &smoothLoopFade, &smoothSpray, &smoothSpread, &smoothEnvFollower, &smoothPitchJitter, &smoothRevProb, &smoothModRate, &smoothModDepth}) {
         s->reset(sampleRate, 0.05);
     }
     smoothEnvFollower.reset(sampleRate, 0.01);
@@ -103,6 +103,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         float prob = 0.001f + (activity * 0.15f); 
         if (transientDetected) prob += (activity * 0.3f); 
         trigger = (dist(rng) < prob); 
+        if (trigger && interruptTimer <= 0) interruptTimer = (int)(repeats * 1.5f * fs + 0.1f * fs);
     }
     else if (globalQuant) trigger = isStep && (dist(rng) < activity + 0.15f);
     else { 
@@ -110,7 +111,11 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         trigger = (dist(rng) < prob); 
     }
 
+    // Safety: algo 7 uses interruptTimer, others use trigger
     if (!trigger && algo != 7) return; 
+    
+    bool spawnInterruptGrain = (algo == 7 && interruptTimer > 0 && dist(rng) < 0.01f);
+    if (!trigger && !spawnInterruptGrain) return;
 
     int spawnCount = (algo == 0 || algo == 3) ? (int)(1 + activity * 12.0f) : 1;
     for (int s = 0; s < spawnCount; ++s) {
@@ -149,7 +154,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
                     g.filterCutoff = 0.85f - (activity * 0.3f);
                 }
                 
-                g.length = std::min(g.length, (float)maxDelaySamples - 100.0f);
+                g.length = std::max(100.0f, std::min(g.length, (float)maxDelaySamples - 100.0f));
 
                 if (jitter > 0.05f) {
                     float jOff = (dist(rng) * 2.0f - 1.0f) * jitter; 
@@ -189,10 +194,10 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     smoothSpread.setTargetValue(apvts.getRawParameterValue("SPREAD")->load());
     smoothPitchJitter.setTargetValue(apvts.getRawParameterValue("PITCH_JITTER")->load());
     smoothRevProb.setTargetValue(apvts.getRawParameterValue("REV_PROB")->load());
+    smoothModRate.setTargetValue(apvts.getRawParameterValue("MOD_RATE")->load());
+    smoothModDepth.setTargetValue(apvts.getRawParameterValue("MOD_DEPTH")->load());
     
     int algo = (int)apvts.getRawParameterValue("ALGO")->load();
-    float modDepth = apvts.getRawParameterValue("MOD_DEPTH")->load();
-    float modRate = apvts.getRawParameterValue("MOD_RATE")->load();
     bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
     
     juce::AudioBuffer<float> wetBuffer(numChannels, numSamples); wetBuffer.clear();
@@ -200,6 +205,8 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     for (int i = 0; i < numSamples; ++i) {
         float timeVal = smoothTime.getNextValue(), effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
         float activityVal = smoothActivity.getNextValue();
+        float modRate = smoothModRate.getNextValue();
+        float modDepth = smoothModDepth.getNextValue();
         
         float primaryRate = 0.01f + modRate * 1.99f;
         mdlPhase += (juce::MathConstants<float>::twoPi * primaryRate) / fs;
@@ -211,8 +218,13 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         float depthSamples = (modDepth * 50.0f / 1000.0f) * fs;
         float currentMdlDelay = (depthSamples + 10.0f) + (compoundLfo * depthSamples);
 
-        scheduleGrains(activityVal, effectiveTimeMs, apvts.getRawParameterValue("SHAPE")->load(), algo, writeIdx, apvts);
+        scheduleGrains(activityVal, effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, apvts);
         
+        if (algo == 7) { 
+            if (interruptTimer > 0) { interruptGate = juce::jmax(0.0f, interruptGate - 0.01f); interruptTimer--; } 
+            else { interruptGate = juce::jmin(1.0f, interruptGate + 0.005f); } 
+        } else { interruptGate = 1.0f; interruptTimer = 0; }
+
         for (int gIdx = 0; gIdx < (int)grains.size(); ++gIdx) {
             auto& g = grains[gIdx];
             if (g.active) {
@@ -246,18 +258,23 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
 
         for (int ch = 0; ch < activeChannels; ++ch) {
             float rawWet = wetBuffer.getSample(ch, i) * masterWet;
+            
+            // MDL Cubic Interpolation for global pitch mod
             mdlBuffer.setSample(ch, mdlWriteIdx, rawWet);
             float mdlReadPos = (float)mdlWriteIdx - currentMdlDelay;
-            
             while (mdlReadPos < 0) mdlReadPos += 16384.0f;
             while (mdlReadPos >= 16384.0f) mdlReadPos -= 16384.0f;
             
             int i0 = (int)std::floor(mdlReadPos);
-            int i1 = (i0 + 1) % 16384; 
             float f = mdlReadPos - (float)i0;
-            float wet = (1.0f - f) * mdlBuffer.getSample(ch, i0) + f * mdlBuffer.getSample(ch, i1);
+            auto getMdl = [&](int idx) { int p = idx % 16384; if (p < 0) p += 16384; return mdlBuffer.getSample(ch, p); };
+            float m0 = getMdl(i0 - 1), m1 = getMdl(i0), m2 = getMdl(i0 + 1), m3 = getMdl(i0 + 2);
+            float a0 = -0.5f*m0 + 1.5f*m1 - 1.5f*m2 + 0.5f*m3, a1 = m0 - 2.5f*m1 + 2.0f*m2 - 0.5f*m3, a2 = -0.5f*m0 + 0.5f*m2, a3 = m1;
+            float wet = a0*f*f*f + a1*f*f + a2*f + a3;
+            if (!std::isfinite(wet)) wet = 0.0f;
             
-            buffer.setSample(ch, i, (buffer.getSample(ch, i) * (1.0f - mix) + wet * mix) * gain);
+            float dry = buffer.getSample(ch, i);
+            buffer.setSample(ch, i, (dry * (1.0f - mix) + wet * mix) * gain);
         }
         mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
         if (!freeze) {
