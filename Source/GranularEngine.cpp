@@ -1,7 +1,7 @@
 /**
- * COSMIC RAYS - Granular Engine Implementation (Refined 3-6-2026)
- * ------------------------------------------------------------
- * Professional granular engine with Kinematic Motion and Global MDL.
+ * COSMIC RAYS - Granular Engine Implementation (Definitive Stability Fix)
+ * ---------------------------------------------------------------------
+ * Robust granular synthesis with proper feedback path and direction logic.
  */
 
 #include "GranularEngine.h"
@@ -111,7 +111,6 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         trigger = (dist(rng) < prob); 
     }
 
-    // Safety: algo 7 uses interruptTimer, others use trigger
     if (!trigger && algo != 7) return; 
     
     bool spawnInterruptGrain = (algo == 7 && interruptTimer > 0 && dist(rng) < 0.01f);
@@ -134,19 +133,19 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
                 offset += (dist(rng) * 2.0f - 1.0f) * spray * (float)fs * 0.5f;
                 g.pan = juce::jlimit(0.0f, 1.0f, 0.5f + (dist(rng) - 0.5f) * (spread + activity * 0.2f));
 
-                if (algo == 0) { // MOSAIC
+                if (algo == 0) { 
                     if (mode == 0) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f; 
                     else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f; 
                     else if (mode == 2) g.startSpeed = 2.0f; 
                     else { float ss[]={0.5f, 1.0f, 2.0f, 4.0f}; g.startSpeed = ss[(int)(dist(rng)*4.0f)]; } 
                     g.endSpeed = g.startSpeed; g.length = lenBase * (0.5f + repeats * 3.0f); 
                 } 
-                else if (algo == 1) { // SEQ
+                else if (algo == 1) { 
                     g.length = lenBase * (0.25f + repeats * 2.0f); 
                     if (mode == 0) { g.filterCutoff = 0.2f + (1.0f - activity) * 0.5f; offset = (float)(dist(rng) * samplesPerStep * 8.0f); } 
                     else if (mode == 1) { g.startSpeed = (dist(rng) < activity) ? 0.5f : 1.0f; g.endSpeed = g.startSpeed; } 
                 }
-                else if (algo == 2) { // GLIDE
+                else if (algo == 2) { 
                     g.length = lenBase * (0.5f + repeats * 10.0f); 
                     float depthSemi = (mode == 1) ? 12.0f : 6.0f;
                     g.startSpeed = (mode == 0) ? 0.75f : (mode == 2 ? 1.5f : 1.0f); 
@@ -178,7 +177,6 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     int numSamples = buffer.getNumSamples(); int numChannels = buffer.getNumChannels();
     updateEnvelopeFollower(buffer);
     
-    // Set Target Values for ALL Parameter Smoothers
     smoothActivity.setTargetValue(apvts.getRawParameterValue("ACTIVITY")->load());
     smoothTime.setTargetValue(apvts.getRawParameterValue("TIME")->load());
     smoothShape.setTargetValue(apvts.getRawParameterValue("SHAPE")->load());
@@ -205,17 +203,17 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     for (int i = 0; i < numSamples; ++i) {
         float timeVal = smoothTime.getNextValue(), effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
         float activityVal = smoothActivity.getNextValue();
-        float modRate = smoothModRate.getNextValue();
-        float modDepth = smoothModDepth.getNextValue();
+        float modRateVal = smoothModRate.getNextValue();
+        float modDepthVal = smoothModDepth.getNextValue();
         
-        float primaryRate = 0.01f + modRate * 1.99f;
+        float primaryRate = 0.01f + modRateVal * 1.99f;
         mdlPhase += (juce::MathConstants<float>::twoPi * primaryRate) / fs;
         mdlPhase2 += (juce::MathConstants<float>::twoPi * 0.073f) / fs; 
         if (mdlPhase >= juce::MathConstants<float>::twoPi) mdlPhase -= juce::MathConstants<float>::twoPi;
         if (mdlPhase2 >= juce::MathConstants<float>::twoPi) mdlPhase2 -= juce::MathConstants<float>::twoPi;
         
         float compoundLfo = (std::sin(mdlPhase) + 0.4f * std::sin(mdlPhase * 2.0f + 0.5f)) * (0.7f + 0.3f * std::sin(mdlPhase2));
-        float depthSamples = (modDepth * 50.0f / 1000.0f) * fs;
+        float depthSamples = (modDepthVal * 50.0f / 1000.0f) * fs;
         float currentMdlDelay = (depthSamples + 10.0f) + (compoundLfo * depthSamples);
 
         scheduleGrains(activityVal, effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, apvts);
@@ -240,7 +238,9 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
                 if (algo == 2) { 
                     float triPhase = (g.age / fs) * (0.05f + activityVal * 4.0f) + g.internalPhase;
                     float tri = 2.0f * std::abs(2.0f * (triPhase - std::floor(triPhase + 0.5f))) - 1.0f;
-                    g.currentPos += g.startSpeed * std::pow(2.0f, (tri * g.endSpeed) / 12.0f);
+                    float speedMultiplier = std::pow(2.0f, (tri * g.endSpeed) / 12.0f);
+                    float instSpeed = (g.reverse ? -g.startSpeed : g.startSpeed) * speedMultiplier;
+                    g.currentPos += instSpeed;
                 } else {
                     g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
                 }
@@ -254,12 +254,13 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
 
         float mix = smoothMix.getNextValue(), gain = smoothGain.getNextValue();
         float masterWet = smoothMasterWetVol.getNextValue();
+        float repeats = smoothRepeats.getNextValue();
         int activeChannels = std::min(numChannels, preparedChannels);
 
         for (int ch = 0; ch < activeChannels; ++ch) {
+            float dryInput = buffer.getSample(ch, i);
             float rawWet = wetBuffer.getSample(ch, i) * masterWet;
             
-            // MDL Cubic Interpolation for global pitch mod
             mdlBuffer.setSample(ch, mdlWriteIdx, rawWet);
             float mdlReadPos = (float)mdlWriteIdx - currentMdlDelay;
             while (mdlReadPos < 0) mdlReadPos += 16384.0f;
@@ -273,14 +274,15 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             float wet = a0*f*f*f + a1*f*f + a2*f + a3;
             if (!std::isfinite(wet)) wet = 0.0f;
             
-            float dry = buffer.getSample(ch, i);
-            buffer.setSample(ch, i, (dry * (1.0f - mix) + wet * mix) * gain);
+            buffer.setSample(ch, i, (dryInput * (1.0f - mix) + wet * mix) * gain);
+            
+            if (!freeze) {
+                float fb = wet * repeats * 0.8f;
+                delayBuffer.setSample(ch, writeIdx, std::tanh(dryInput + fb));
+            }
         }
         mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
-        if (!freeze) {
-            for (int ch = 0; ch < activeChannels; ++ch) delayBuffer.setSample(ch, writeIdx, buffer.getSample(ch, i));
-            writeIdx = (writeIdx + 1) % maxDelaySamples;
-        }
+        if (!freeze) writeIdx = (writeIdx + 1) % maxDelaySamples;
     }
     
     for (int ch = 0; ch < numChannels; ++ch) {
