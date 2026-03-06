@@ -1,5 +1,7 @@
 # Cosmic Rays (Beta 3-6-2026)
 
+**Official Website:** [beechem.site/cosmic-rays](https://beechem.site/cosmic-rays)
+
 Cosmic Rays is a professional-grade granular processor for macOS and Linux, inspired by boutique hardware granular synthesis. It utilizes advanced kinematic motion models and a dedicated global modulation engine to create lush, nostalgic, and evolving sonic textures.
 
 <img width="660" height="494" alt="image" src="https://github.com/user-attachments/assets/bef1af24-72f3-439b-aff2-89b7f899e44a" />

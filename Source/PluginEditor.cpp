@@ -191,6 +191,30 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     helpButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::appleBeige.darker(0.2f));
     helpButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
     helpButton.onClick = [this]() { helpOverlay.setVisible(!helpOverlay.isVisible()); if (helpOverlay.isVisible()) helpOverlay.toFront(false); };
+    
+    addAndMakeVisible (feedbackButton); feedbackButton.setButtonText ("BUG");
+    feedbackButton.setLookAndFeel(&customLookAndFeel);
+    feedbackButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::appleBeige.darker(0.2f));
+    feedbackButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
+    feedbackButton.onClick = [this]() { 
+        juce::String url = "https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?title=Feedback:%20" + currentVersion.replace(" ", "%20") + "&body=Please%20describe%20your%20issue%20or%20feedback%20below:%0A%0A";
+        juce::URL(url).launchInDefaultBrowser(); 
+    };
+
+    addChildComponent (updateButton); updateButton.setButtonText ("UPDATE!");
+    updateButton.setLookAndFeel(&customLookAndFeel);
+    updateButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::appleRed);
+    updateButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
+    updateButton.onClick = []() { juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases").launchInDefaultBrowser(); };
+    
+    juce::Thread::launch([this]() {
+        juce::URL url("https://raw.githubusercontent.com/KhanTheDaleK1/cosmic-rays/main/version.txt");
+        juce::String latestVersion = url.readEntireTextStream().trim();
+        if (latestVersion.isNotEmpty() && latestVersion != currentVersion) {
+            juce::MessageManager::callAsync([this]() { updateButton.setVisible(true); });
+        }
+    });
+
     addAndMakeVisible (shiftButton); shiftButton.setButtonText ("SHIFT");
     shiftButton.setLookAndFeel(&customLookAndFeel);
     shiftButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::appleBeige.darker(0.1f));
@@ -485,8 +509,12 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
 void CosmicRaysAudioProcessorEditor::resized() {
     auto area = getLocalBounds().reduced (20); auto header = area.removeFromTop (80); auto footer = area.removeFromBottom (100);
     
-    // Help button in top right, inline with version
+    // Header right buttons (Help, Bug, Update)
     helpButton.setBounds(header.removeFromRight(25).removeFromTop(20).translated(0, 35));
+    header.removeFromRight(5); // gap
+    feedbackButton.setBounds(header.removeFromRight(35).removeFromTop(20).translated(0, 35));
+    header.removeFromRight(5); // gap
+    updateButton.setBounds(header.removeFromRight(65).removeFromTop(20).translated(0, 35));
 
     auto controlHeader = area.removeFromTop(40);
     algoBox.setBounds (controlHeader.removeFromLeft (160).reduced (5, 5));

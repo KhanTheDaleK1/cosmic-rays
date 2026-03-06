@@ -93,7 +93,7 @@ private:
     juce::ComboBox algoBox, looperModeBox, windowTypeBox;
     juce::GroupComponent looperBox, timeBox, shapeBox;
     juce::TextButton helpButton, shiftButton, tapButton, looperRecButton, looperOdubButton, freezeButton; 
-    juce::TextButton undoButton, redoButton;
+    juce::TextButton undoButton, redoButton, feedbackButton, updateButton;
     juce::TextButton time1_4Button, time1_2Button, time1xButton, time2xButton, time4xButton, time8xButton;
     juce::TextButton shapeAButton, shapeBButton, shapeCButton, shapeDButton;
     juce::ToggleButton quantizeButton, reverseButton, killDryButton, trailsButton;
@@ -103,6 +103,8 @@ private:
     juce::Label jitterLabel, revProbLabel;
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
     juce::Label cpuLabel, ramLabel;
+
+    juce::String currentVersion = "Beta 3-6-2026";
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;
