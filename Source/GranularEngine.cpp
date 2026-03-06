@@ -1,7 +1,7 @@
 /**
- * COSMIC RAYS - Granular Engine Implementation
- * -------------------------------------------
- * Implementation of advanced granular DSP algorithms.
+ * COSMIC RAYS - Granular Engine Implementation (Refined 3-6-2026)
+ * ------------------------------------------------------------
+ * Robust kinematic granular synthesis with global MDL pitch modulation.
  */
 
 #include "GranularEngine.h"
@@ -15,23 +15,20 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     fs = sampleRate;
     preparedChannels = numChannels;
     
-    // Allocate memory for real-time ring buffers
-    maxDelaySamples = static_cast<int>(sampleRate * 2.0); // 2 second live buffer
-    maxHoldSamples = static_cast<int>(sampleRate * 1.0);  // 1 second freeze buffer
+    maxDelaySamples = static_cast<int>(sampleRate * 2.0); 
+    maxHoldSamples = static_cast<int>(sampleRate * 1.0);  
     delayBuffer.setSize(numChannels, maxDelaySamples);
     holdBuffer.setSize(numChannels, maxHoldSamples);
-    loopBuffer.setSize(numChannels, (int)(sampleRate * 60.0)); // 60 second looper
-    mdlBuffer.setSize(numChannels, 8192); // Global pitch mod buffer
+    loopBuffer.setSize(numChannels, (int)(sampleRate * 60.0)); 
+    mdlBuffer.setSize(numChannels, 16384); 
     
     delayBuffer.clear(); holdBuffer.clear(); loopBuffer.clear(); mdlBuffer.clear();
     writeIdx = 0; holdWriteIdx = 0; mdlWriteIdx = 0; mdlPhase = 0.0f; mdlPhase2 = 0.0f; mdlPhase3 = 0.0f;
     holdLocked = false;
 
-    // Prepare JUCE DSP Chain
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
     fxChain.prepare(spec);
     
-    // Initialize Diffusion Network (Stereo widening / texture blurring)
     diffusers.clear(); diffuserPhases.assign(numDiffusers, 0.0f);
     for (int i = 0; i < numDiffusers; ++i) {
         auto d = std::make_unique<juce::dsp::DelayLine<float>>(8000);
@@ -39,7 +36,6 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
         diffusers.push_back(std::move(d)); diffuserPhases[i] = dist(rng);
     }
 
-    // Prepare filters and dynamics
     auto tiltCoeffs = juce::dsp::IIR::Coefficients<float>::makeLowShelf(sampleRate, 100.0f, 0.707f, 1.25f);
     tiltFilterL.coefficients = tiltFilterR.coefficients = tiltCoeffs;
     tiltFilterL.prepare(spec); tiltFilterR.prepare(spec);
@@ -47,9 +43,8 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     
     currentFilterMode = juce::dsp::LadderFilterMode::LPF12; 
     fxChain.get<0>().setMode(currentFilterMode);
-    fxChain.get<2>().setMix(0.0f); // Default chorus bypassed
+    fxChain.get<2>().setMix(0.0f); 
 
-    // Reset Smoothing Engines
     for (auto* s : {&smoothActivity, &smoothTime, &smoothShape, &smoothRepeats, &smoothFilter, &smoothSpace, &smoothMix, &smoothGain, &smoothLoopLevel, &smoothDrift, &smoothSnap, &smoothMasterWetVol, &smoothLoopFade, &smoothSpray, &smoothSpread, &smoothEnvFollower, &smoothPitchJitter, &smoothRevProb}) {
         s->reset(sampleRate, 0.05);
     }
@@ -64,11 +59,17 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
 
 float GranularEngine::getNextSampleCubic(int channel, float readPos) {
     if (channel >= delayBuffer.getNumChannels()) channel = 0;
-    int i = (int)readPos; float f = readPos - (float)i;
-    auto get = [&](int idx) { int pos = (idx + maxDelaySamples) % maxDelaySamples; return delayBuffer.getSample(channel, pos); };
+    int i = (int)std::floor(readPos);
+    float f = readPos - (float)i;
+    auto get = [&](int idx) {
+        int pos = idx % maxDelaySamples;
+        if (pos < 0) pos += maxDelaySamples;
+        return delayBuffer.getSample(channel, pos);
+    };
     float y0 = get(i - 1), y1 = get(i), y2 = get(i + 1), y3 = get(i + 2);
     float a0 = -0.5f*y0 + 1.5f*y1 - 1.5f*y2 + 0.5f*y3, a1 = y0 - 2.5f*y1 + 2.0f*y2 - 0.5f*y3, a2 = -0.5f*y0 + 0.5f*y2, a3 = y1;
-    float out = a0*f*f*f + a1*f*f + a2*f + a3; return std::isnan(out) ? 0.0f : out;
+    float out = a0*f*f*f + a1*f*f + a2*f + a3;
+    return std::isfinite(out) ? out : 0.0f;
 }
 
 void GranularEngine::updateEnvelopeFollower(const juce::AudioBuffer<float>& buffer) {
@@ -98,7 +99,6 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
     if (grainClock >= samplesPerStep) { grainClock -= samplesPerStep; stepCount = (stepCount + 1) % 16; isStep = true; }
     
     bool trigger = false; int mode = (int)(shape * 3.99f); 
-    // Triggering Logic: Stochastic vs. Rhythmic
     if (algo == 7) { 
         float prob = 0.001f + (activity * 0.15f); 
         if (transientDetected) prob += (activity * 0.3f); 
@@ -118,7 +118,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
             auto& g = grains[i];
             if (!g.active) {
                 g.active = true; g.age = 0.0f; g.startSpeed = 1.0f; g.endSpeed = 1.0f;
-                g.internalPhase = dist(rng); // Stochastic phase start
+                g.internalPhase = dist(rng); 
                 g.reverse = (dist(rng) < revProb) ? !globalRev : globalRev; 
                 g.filterCutoff = 1.0f; g.bitCrush = 1.0f; g.isSustainer = false;
                 
@@ -126,11 +126,9 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
                 float random_spread = (dist(rng) * 2.0f - 1.0f) * activity * 1000.0f;
                 float offset = dist(rng) * (float)fs * (0.1f + activity * 1.0f) + random_spread;
                 
-                // Secondary Modifiers: Spray & Spread
                 offset += (dist(rng) * 2.0f - 1.0f) * spray * (float)fs * 0.5f;
                 g.pan = juce::jlimit(0.0f, 1.0f, 0.5f + (dist(rng) - 0.5f) * (spread + activity * 0.2f));
 
-                // --- Algorithm Implementations ---
                 if (algo == 0) { // MOSAIC
                     if (mode == 0) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f; 
                     else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f; 
@@ -143,22 +141,23 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
                     if (mode == 0) { g.filterCutoff = 0.2f + (1.0f - activity) * 0.5f; offset = (float)(dist(rng) * samplesPerStep * 8.0f); } 
                     else if (mode == 1) { g.startSpeed = (dist(rng) < activity) ? 0.5f : 1.0f; g.endSpeed = g.startSpeed; } 
                 }
-                else if (algo == 2) { // GLIDE (Wah-Glide Refinement)
+                else if (algo == 2) { // GLIDE
                     g.length = lenBase * (0.5f + repeats * 10.0f); 
                     float depthSemi = (mode == 1) ? 12.0f : 6.0f;
                     g.startSpeed = (mode == 0) ? 0.75f : (mode == 2 ? 1.5f : 1.0f); 
-                    g.endSpeed = depthSemi; // Semitone depth
+                    g.endSpeed = depthSemi; 
                     g.filterCutoff = 0.85f - (activity * 0.3f);
                 }
                 
-                // Additive Pitch Jitter (Global override)
+                g.length = std::min(g.length, (float)maxDelaySamples - 100.0f);
+
                 if (jitter > 0.05f) {
                     float jOff = (dist(rng) * 2.0f - 1.0f) * jitter; 
                     float multiplier = std::pow(2.0f, jOff / 12.0f);
                     g.startSpeed *= multiplier;
                 }
                 
-                offset += 0.0075f * (float)fs; // System latency alignment
+                offset += 0.0075f * (float)fs; 
                 g.currentPos = (float)currentWriteIdx - offset; 
                 while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples; 
                 while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
@@ -174,27 +173,34 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     int numSamples = buffer.getNumSamples(); int numChannels = buffer.getNumChannels();
     updateEnvelopeFollower(buffer);
     
-    // Set Target Values for Parameter Smoothing
-    float activityVal = apvts.getRawParameterValue("ACTIVITY")->load();
-    smoothActivity.setTargetValue(activityVal);
+    // Set Target Values for ALL Parameter Smoothers
+    smoothActivity.setTargetValue(apvts.getRawParameterValue("ACTIVITY")->load());
     smoothTime.setTargetValue(apvts.getRawParameterValue("TIME")->load());
+    smoothShape.setTargetValue(apvts.getRawParameterValue("SHAPE")->load());
     smoothRepeats.setTargetValue(apvts.getRawParameterValue("REPEATS")->load());
     smoothFilter.setTargetValue(apvts.getRawParameterValue("FILTER")->load());
     smoothSpace.setTargetValue(apvts.getRawParameterValue("SPACE")->load());
     smoothMix.setTargetValue(apvts.getRawParameterValue("MIX")->load());
     smoothGain.setTargetValue(apvts.getRawParameterValue("GAIN")->load());
+    smoothMasterWetVol.setTargetValue(apvts.getRawParameterValue("MASTER_WET_VOL")->load());
+    smoothLoopFade.setTargetValue(apvts.getRawParameterValue("LOOP_FADE")->load());
+    smoothLoopLevel.setTargetValue(apvts.getRawParameterValue("LOOP_LEVEL")->load());
+    smoothSpray.setTargetValue(apvts.getRawParameterValue("SPRAY")->load());
+    smoothSpread.setTargetValue(apvts.getRawParameterValue("SPREAD")->load());
+    smoothPitchJitter.setTargetValue(apvts.getRawParameterValue("PITCH_JITTER")->load());
+    smoothRevProb.setTargetValue(apvts.getRawParameterValue("REV_PROB")->load());
     
     int algo = (int)apvts.getRawParameterValue("ALGO")->load();
     float modDepth = apvts.getRawParameterValue("MOD_DEPTH")->load();
     float modRate = apvts.getRawParameterValue("MOD_RATE")->load();
+    bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
     
     juce::AudioBuffer<float> wetBuffer(numChannels, numSamples); wetBuffer.clear();
     
-    // --- Sample Processing Loop ---
     for (int i = 0; i < numSamples; ++i) {
         float timeVal = smoothTime.getNextValue(), effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
+        float activityVal = smoothActivity.getNextValue();
         
-        // Global MDL Pitch Modulation (Tape Warble logic)
         float primaryRate = 0.01f + modRate * 1.99f;
         mdlPhase += (juce::MathConstants<float>::twoPi * primaryRate) / fs;
         mdlPhase2 += (juce::MathConstants<float>::twoPi * 0.073f) / fs; 
@@ -205,9 +211,8 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         float depthSamples = (modDepth * 50.0f / 1000.0f) * fs;
         float currentMdlDelay = (depthSamples + 10.0f) + (compoundLfo * depthSamples);
 
-        scheduleGrains(smoothActivity.getNextValue(), effectiveTimeMs, apvts.getRawParameterValue("SHAPE")->load(), algo, writeIdx, apvts);
+        scheduleGrains(activityVal, effectiveTimeMs, apvts.getRawParameterValue("SHAPE")->load(), algo, writeIdx, apvts);
         
-        // --- Per-Grain DSP Engine ---
         for (int gIdx = 0; gIdx < (int)grains.size(); ++gIdx) {
             auto& g = grains[gIdx];
             if (g.active) {
@@ -220,40 +225,50 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
                 wetBuffer.addSample(0, i, sL * (1.0f - g.pan)); 
                 if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan);
                 
-                // Kinematic Position Update
-                if (algo == 2) { // Wah-Glide
+                if (algo == 2) { 
                     float triPhase = (g.age / fs) * (0.05f + activityVal * 4.0f) + g.internalPhase;
                     float tri = 2.0f * std::abs(2.0f * (triPhase - std::floor(triPhase + 0.5f))) - 1.0f;
                     g.currentPos += g.startSpeed * std::pow(2.0f, (tri * g.endSpeed) / 12.0f);
                 } else {
                     g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
                 }
+                
+                while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples;
+                while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+
                 if (++g.age >= g.length) g.active = false;
             }
         }
 
-        // Final Mix and Modulation application
         float mix = smoothMix.getNextValue(), gain = smoothGain.getNextValue();
+        float masterWet = smoothMasterWetVol.getNextValue();
         int activeChannels = std::min(numChannels, preparedChannels);
 
         for (int ch = 0; ch < activeChannels; ++ch) {
-            float rawWet = wetBuffer.getSample(ch, i);
+            float rawWet = wetBuffer.getSample(ch, i) * masterWet;
             mdlBuffer.setSample(ch, mdlWriteIdx, rawWet);
             float mdlReadPos = (float)mdlWriteIdx - currentMdlDelay;
-            while (mdlReadPos < 0) mdlReadPos += 8192.0f;
-            int i0 = (int)mdlReadPos, i1 = (i0 + 1) % 8192; float f = mdlReadPos - (float)i0;
+            
+            while (mdlReadPos < 0) mdlReadPos += 16384.0f;
+            while (mdlReadPos >= 16384.0f) mdlReadPos -= 16384.0f;
+            
+            int i0 = (int)std::floor(mdlReadPos);
+            int i1 = (i0 + 1) % 16384; 
+            float f = mdlReadPos - (float)i0;
             float wet = (1.0f - f) * mdlBuffer.getSample(ch, i0) + f * mdlBuffer.getSample(ch, i1);
             
             buffer.setSample(ch, i, (buffer.getSample(ch, i) * (1.0f - mix) + wet * mix) * gain);
         }
-        mdlWriteIdx = (mdlWriteIdx + 1) % 8192;
-        if (!apvts.getRawParameterValue("FREEZE")->load()) writeIdx = (writeIdx + 1) % maxDelaySamples;
+        mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
+        if (!freeze) {
+            for (int ch = 0; ch < activeChannels; ++ch) delayBuffer.setSample(ch, writeIdx, buffer.getSample(ch, i));
+            writeIdx = (writeIdx + 1) % maxDelaySamples;
+        }
     }
     
-    // DC Blocker & NaN Safety
     for (int ch = 0; ch < numChannels; ++ch) {
         float* data = buffer.getWritePointer(ch);
-        for (int s = 0; s < numSamples; ++s) if (std::isnan(data[s]) || std::isinf(data[s])) data[s] = 0.0f;
+        for (int s = 0; s < numSamples; ++s) if (!std::isfinite(data[s])) data[s] = 0.0f;
     }
     juce::dsp::AudioBlock<float> outputBlock(buffer); 
     limiter.process(juce::dsp::ProcessContextReplacing<float>(outputBlock));
