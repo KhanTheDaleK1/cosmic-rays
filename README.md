@@ -1,43 +1,39 @@
-# Cosmic Rays
+# Cosmic Rays (Beta 3-6-2026)
 
-Cosmic Rays is a cross-platform (macOS/Linux) audio plugin (AU/VST3/LV2) that provides advanced granular synthesis and glitch effects. It features a high-density granular engine with tape-style delay, rhythmic sequencing, and dynamic pattern generation.
+Cosmic Rays is a professional-grade granular processor for macOS and Linux, inspired by boutique hardware granular synthesis. It utilizes advanced kinematic motion models and a dedicated global modulation engine to create lush, nostalgic, and evolving sonic textures.
 
-**Version:** Beta (March 3, 2026)
+## Key Features
 
-## Features
-- **11 Unique Algorithms**:
-  - *Micro Loop*: Mosaic, Seq, Glide
-  - *Granules*: Haze, Tunnel, Strum
-  - *Glitch*: Blocks, Interrupt, Arp
-  - *Multidelay*: Pattern, Warp
-- **Advanced Granular Engine**: Dynamic envelope shaping (Sine, Tri, Saw, Square, Rand), pitch modulation, rhythmic quantizing, and reverse capabilities.
-- **Hardware-Style DSP**: Integrated Reverb and analog-style Ladder Filter (logarithmic LPF/HPF).
-- **Phase Looper Controls**: Reverse playback and Quantize (locks triggers to the tempo grid).
-- **UI**: Modern teal/grey responsive interface with Tap Tempo LED and multi-function parameter mappings (Shift controls).
-- **Cross-Platform**: Support for AU, VST3, and LV2 formats.
+### 1. Advanced Granular DSP
+- **Kinematic Grain Motion:** Grains follow ballistic trajectories ($x = x_0 + v_0t + 0.5at^2$), delivering liquid-smooth pitch glissandos without digital artifacts.
+- **Wah-Glide Model:** Sinusoidal internal pitch oscillation within each grain for organic, vocal-like movement.
+- **Microcosm-Style Algorithms:** 11 unique modes including Mosaic, Seq, Glide, and Strum, precisely tuned to hardware specifications.
 
-## Quick Installation
+### 2. Global Modulation Engine (MDL)
+- **Prime-Ratio LFOs:** Summation of three oscillators at prime-number ratios for non-repeating, organic "tape drift."
+- **Broken Capstan Algorithm:** Asymmetrical LFO curves combined with deep delay lines (up to 50ms) simulate the lurching instability of failing tape motors.
+- **Musical Warble:** A high-range (up to 8Hz) vibrato stage with amplitude surging for nostalgic shimmer.
 
-[![Download Cosmic Rays Beta](https://img.shields.io/badge/DOWNLOAD-Cosmic%20Rays%20Beta%20(macOS%20%26%20Linux)-009DDC?style=for-the-badge&logo=github)](https://github.com/KhanTheDaleK1/cosmic-rays/raw/main/CosmicRays_Beta_3-3-2026.zip)
+### 3. Professional UI/UX
+- **Real-time Waveform Visualizer:** See exactly where grains are being sampled in the live buffer.
+- **Dynamic Density Meter:** Monitor engine load and active grain count.
+- **Power-User Shortcuts:** Full Undo/Redo (Cmd+Z), instant algorithm switching (1-0), and high-precision Fine-Tune mode (Shift).
+- **Performance HUD:** Real-time CPU thread load and RAM footprint monitoring.
 
-*Windows installer coming soon.*
+## Controls
 
-- **macOS**: Extract the zip and double-click the `Install_CosmicRays.app` for a 1-click terminal-free installation.
-  - *Note for macOS users:* If you see a message saying the app "cannot be opened because it is from an unidentified developer," go to **System Settings > Privacy & Security**, scroll down to the "Security" section, and click **"Open Anyway"**.
-- **Linux**: Extract and double-click the included `.desktop` or `install.sh` file.
+- **Activity:** Governs trigger density and internal oscillation rate.
+- **Repeats:** Scales grain lifecycle and stacking duration.
+- **Shape (Variation):** Selects from 4 sub-modes (A, B, C, D) per algorithm.
+- **Shift Functions:**
+  - **Shift + Repeats:** Global Modulation Depth.
+  - **Shift + Shape:** Global Modulation Rate.
+  - **Shift + Filter:** Filter Resonance.
 
-## Build Instructions (For Source)
-### Prerequisites
-- CMake (3.15 or later)
-- C++17 compiler (GCC/Clang)
-- **Linux**: `libasound2-dev libjack-jackd2-dev libx11-dev libxext-dev libxinerama-dev libxrandr-dev libxcursor-dev libfreetype6-dev libcurl4-openssl-dev libwebkit2gtk-4.1-dev`
-
-### Build
-```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
-```
+## Build Requirements
+- **JUCE 8.0+**
+- **CMake 3.15+**
+- **Compiler:** Clang (macOS) or GCC (Linux) with C++17 support.
 
 ## License
 MIT

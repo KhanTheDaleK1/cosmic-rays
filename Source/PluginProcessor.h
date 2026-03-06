@@ -37,8 +37,14 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    GranularEngine& getGranularEngine() { return granularEngine; }
+
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioVisualiserComponent visualiser;
+    juce::UndoManager undoManager;
+    juce::AudioProcessLoadMeasurer loadMeasurer;
+
+    double getCPUUsage() { return loadMeasurer.getLoadAsPercentage(); }
 
 private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

@@ -8,6 +8,7 @@ public:
     CustomLookAndFeel();
     void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
                            float rotaryStartAngle, float rotaryEndAngle, juce::Slider& slider) override;
+    juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
     
     struct Colors {
         static inline const juce::Colour appleBeige   { 0xFFCECECE };
@@ -30,9 +31,25 @@ private:
     CosmicRaysAudioProcessor& processor;
 };
 
-class GrainShapeVisualizer : public juce::Component {
+class PitchVisualizer : public juce::Component {
 public:
-    GrainShapeVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
+    PitchVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
+    void paint(juce::Graphics& g) override;
+private:
+    CosmicRaysAudioProcessor& processor;
+};
+
+class DensityMeter : public juce::Component {
+public:
+    DensityMeter(CosmicRaysAudioProcessor& p) : processor(p) {}
+    void paint(juce::Graphics& g) override;
+private:
+    CosmicRaysAudioProcessor& processor;
+};
+
+class WaveformVisualizer : public juce::Component {
+public:
+    WaveformVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
     void paint(juce::Graphics& g) override;
 private:
     CosmicRaysAudioProcessor& processor;
@@ -57,31 +74,44 @@ public:
     void resized() override;
     void timerCallback() override;
 
+    bool keyPressed (const juce::KeyPress& key) override;
+    void modifierKeysChanged (const juce::ModifierKeys& modifiers) override;
+
 private:
     CustomLookAndFeel customLookAndFeel;
     CosmicRaysAudioProcessor& processor;
 
     FilterVisualizer filterVis;
-    GrainShapeVisualizer grainShapeVis;
+    PitchVisualizer pitchVis;
+    DensityMeter densityMeter;
+    WaveformVisualizer waveformVis;
     HelpComponent helpOverlay;
 
-    juce::Slider activitySlider, timeSlider, shapeSlider, repeatsSlider, filterSlider, spaceSlider, mixSlider, loopLevelSlider, gainSlider;
-    juce::Slider modRateSlider, modDepthSlider;
-    juce::ComboBox algoBox, looperModeBox, presetBox;
-    juce::TextButton shiftButton, tapButton, freezeButton, helpButton; 
-    juce::TextButton looperRecButton, looperOdubButton;
+    juce::Slider activitySlider, repeatsSlider, filterSlider, spaceSlider, mixSlider, loopLevelSlider, gainSlider;
+    juce::Slider modRateSlider, modDepthSlider, spraySlider, spreadSlider;
+    juce::Slider jitterSlider, revProbSlider;
+    juce::ComboBox algoBox, looperModeBox, windowTypeBox;
+    juce::GroupComponent looperBox, timeBox, shapeBox;
+    juce::TextButton helpButton, shiftButton, tapButton, looperRecButton, looperOdubButton, freezeButton; 
+    juce::TextButton undoButton, redoButton;
+    juce::TextButton time1_4Button, time1_2Button, time1xButton, time2xButton, time4xButton, time8xButton;
+    juce::TextButton shapeAButton, shapeBButton, shapeCButton, shapeDButton;
     juce::ToggleButton quantizeButton, reverseButton, killDryButton, trailsButton;
 
-    juce::Label activityLabel, timeLabel, shapeLabel, repeatsLabel, filterLabel, spaceLabel, mixLabel, loopLevelLabel, algoLabel, gainLabel, looperModeLabel;
-    juce::Label modRateLabel, modDepthLabel, killDryLabel, trailsLabel;
+    juce::Label activityLabel, repeatsLabel, filterLabel, spaceLabel, mixLabel, loopLevelLabel, algoLabel, gainLabel, looperModeLabel;
+    juce::Label modRateLabel, modDepthLabel, killDryLabel, trailsLabel, sprayLabel, spreadLabel;
+    juce::Label jitterLabel, revProbLabel;
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
+    juce::Label cpuLabel, ramLabel;
 
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, timeAttach, shapeAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> algoAttach, looperModeAttach, presetAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> jitterAttach, revProbAttach;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> algoAttach, looperModeAttach, windowTypeAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> quantizeAttach, reverseAttach, freezeAttach, looperRecAttach, looperOdubAttach, killDryAttach, trailsAttach;
 
     bool isShiftPressed = false;
+    bool isFineMode = false;
     void updateLabels();
 
     // Tap Tempo State
@@ -89,7 +119,6 @@ private:
     void handleTap();
 
     bool ledOn = false;
-    uint32_t lastBlinkTime = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CosmicRaysAudioProcessorEditor)
 };

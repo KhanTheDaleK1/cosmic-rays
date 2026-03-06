@@ -11,7 +11,7 @@ CosmicRaysAudioProcessor::CosmicRaysAudioProcessor()
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
                        ),
-       apvts (*this, nullptr, "Parameters", createParameterLayout()),
+       apvts (*this, &undoManager, "Parameters", createParameterLayout()),
        visualiser(1)
 #endif
 {
@@ -63,19 +63,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
     
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "GAIN", 1 }, "Output Gain", 0.0f, 2.0f, 1.0f));
     
-    // 16 Presets (4 banks of 4)
-    juce::StringArray presets;
-    for (int b = 1; b <= 4; ++b) for (int s = 1; s <= 4; ++s) presets.add ("Bank " + juce::String(b) + " - " + juce::String(s));
-    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "PRESET", 1 }, "Preset", presets, 0));
-
+    // New parameters from research
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SPRAY", 1 }, "Spray", 0.0f, 1.0f, 0.2f));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SPREAD", 1 }, "Spread", 0.0f, 1.0f, 0.5f));
+    
+    // New parameters from LiveGranularFX
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "PITCH_JITTER", 1 }, "Pitch Jitter", 0.0f, 12.0f, 0.0f));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "WINDOW_TYPE", 1 }, "Window Type", 
+        juce::StringArray {"Sine", "Tri", "Saw", "Square", "Rand", "Hann", "Hamming", "Gaussian", "Rect"}, 0));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "REV_PROB", 1 }, "Rev Prob", 0.0f, 1.0f, 0.0f));
+    
     // Phase Looper Controls
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "LOOPER_MODE", 1 }, "Looper Routing", 
-        juce::StringArray { "Pre-FX", "Post-FX" }, 0));
+        juce::StringArray { "LOOPER ONLY", "PARALLEL", "FX -> LOOPER", "LOOPER -> FX" }, 1));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_REC", 1 }, "Looper Record", false));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_ODUB", 1 }, "Looper Overdub", false));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_QUANT", 1 }, "Quantize", false));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "LOOPER_REV", 1 }, "Reverse", false));
 
+    // FX Master Controls
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "MASTER_WET_VOL", 1 }, "Effect Volume", 0.0f, 2.0f, 1.0f));
+    params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "REVERB_MODE", 1 }, "Reverb Mode", juce::StringArray { "ROOM", "MEDIUM", "HALL", "AMBIENT" }, 2));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "LOOP_FADE", 1 }, "Loop Fade", 0.0f, 1.0f, 1.0f));
+    
     return { params.begin(), params.end() };
 }
 
@@ -93,7 +103,9 @@ const juce::String CosmicRaysAudioProcessor::getProgramName (int index) { return
 void CosmicRaysAudioProcessor::changeProgramName (int index, const juce::String& newName) {}
 
 void CosmicRaysAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock) {
-    int numChannels = getTotalNumInputChannels() > 0 ? getTotalNumInputChannels() : 2;
+    loadMeasurer.reset(sampleRate, samplesPerBlock);
+    int numChannels = std::max(getTotalNumInputChannels(), getTotalNumOutputChannels());
+    if (numChannels <= 0) numChannels = 2;
     granularEngine.prepare(sampleRate, samplesPerBlock, numChannels);
     visualiser.clear();
 }
@@ -123,6 +135,7 @@ bool CosmicRaysAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 
 void CosmicRaysAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+    juce::AudioProcessLoadMeasurer::ScopedTimer timer (loadMeasurer);
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
