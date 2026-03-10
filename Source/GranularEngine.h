@@ -12,29 +12,24 @@
 #include <juce_dsp/juce_dsp.h>
 #include <vector>
 #include <random>
+#include "./helpers/Helpers.h"
+#include "./dsp/BufferReaders.h"
 
 /**
  * Grain Structure
  * Represents a single micro-loop with ballistic pitch trajectory support.
  */
-struct Grain {
-    float currentPos = 0.0f;    // Current read position in the delay buffer
-    float startPos = 0.0f;      // Original trigger position (for kinematic calcs)
-    float length = 0.0f;        // Total duration in samples
-    float startSpeed = 1.0f;    // Base playback rate (unity = 1.0)
-    float endSpeed = 1.0f;      // Target playback rate (or depth overloading)
-    float internalPhase = 0.0f; // Phase offset for internal 'wah' oscillations
-    float pan = 0.5f;           // Stereo position (0.0 = Left, 1.0 = Right)
-    float age = 0.0f;           // Current age in samples
-    int windowType = 0;         // Envelope shape index
-    bool active = false;        // Trigger status
-    bool reverse = false;       // Playback direction
-    
-    // Per-grain modifiers
-    float filterCutoff = 1.0f;
-    float filterRes = 0.0f;
-    float bitCrush = 1.0f;      // 1.0 = no crush, < 1.0 = reduction
-    bool isSustainer = false;   // Special flag for SEQ-mode sustain grains
+
+struct GrainParams
+{
+    bool globalRev;
+    bool globalQuant;
+    float repeats;
+    float spray;
+    float spread;
+    float jitter;
+    float revProb;
+    int globalWin;
 };
 
 class GranularEngine {
@@ -45,7 +40,7 @@ public:
      * Initializes all buffers and DSP chains.
      * @param numChannels Maximum channels supported (max of input/output)
      */
-    void prepare(double sampleRate, int samplesPerBlock, int numChannels);
+    void prepare(double sampleRate, int samplesPerBlock, int numChannels, juce::AudioProcessorValueTreeState& apvts);
     
     /**
      * Main processing loop called by the AudioProcessor.
@@ -73,18 +68,21 @@ private:
     /**
      * Handles the logic for spawning new grains based on selected algorithm.
      */
-    void scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, juce::AudioProcessorValueTreeState& apvts);
+    void scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, const GrainParams& gp);
 
     // --- Core Memory Partitions ---
     juce::AudioBuffer<float> delayBuffer; // Primary real-time ring buffer
     juce::AudioBuffer<float> holdBuffer;  // Frozen sampler partition
     juce::AudioBuffer<float> loopBuffer;  // Dedicated Phrase Looper storage
-    juce::AudioBuffer<float> mdlBuffer;   // Global Pitch Modulation buffer (8192 samples)
-    
+    //juce::AudioBuffer<float> mdlBuffer;   // Global Pitch Modulation buffer (8192 samples)
+
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> mdlDelayL;
+    juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> mdlDelayR;
+
     // --- State Indices ---
     int writeIdx = 0;
     int holdWriteIdx = 0;
-    int mdlWriteIdx = 0;
+    //int mdlWriteIdx = 0;
     int preparedChannels = 2;
     int loopWritePos = 0, loopReadPos = 0, loopLength = 0;
     
@@ -136,4 +134,18 @@ private:
     std::uniform_real_distribution<float> dist;
     double fs = 44100.0;
     int maxDelaySamples = 0, maxHoldSamples = 0;
+    juce::AudioBuffer<float> wetBuffer;
+    std::vector<int> activeGrainIndices;
+    std::vector<int> freeGrainIndices;
+    Helpers helpers;
+    int recordedSamples = 0;
+    BufferReaders bufferReaders;
+    std::atomic<float>* pLooperRev;
+    std::atomic<float>* pLooperQuant;
+    std::atomic<float>* pLooperRepeats;
+    std::atomic<float>* pLooperSpray;
+    std::atomic<float>* pLooperSpread;
+    std::atomic<float>* pLooperPitchJitter;
+    std::atomic<float>* pLooperRevProb;
+    std::atomic<float>* pLooperWindowType;
 };

@@ -106,7 +106,7 @@ void CosmicRaysAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     loadMeasurer.reset(sampleRate, samplesPerBlock);
     int numChannels = std::max(getTotalNumInputChannels(), getTotalNumOutputChannels());
     if (numChannels <= 0) numChannels = 2;
-    granularEngine.prepare(sampleRate, samplesPerBlock, numChannels);
+    granularEngine.prepare(sampleRate, samplesPerBlock, numChannels, apvts);
     visualiser.clear();
 }
 

@@ -22,3 +22,4 @@ _deps/
 # JUCE
 JUCE/
 /JuceLibraryCode/
+/Builds/VisualStudio2022
