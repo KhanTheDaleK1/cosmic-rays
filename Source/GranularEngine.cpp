@@ -11,22 +11,35 @@ GranularEngine::GranularEngine() : rng(std::random_device{}()), dist(0.0f, 1.0f)
     grains.resize(64); 
 }
 
-void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChannels) {
+void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChannels, juce::AudioProcessorValueTreeState& apvts) {
     fs = sampleRate;
-    preparedChannels = numChannels;
+    preparedChannels = std::max(1, numChannels);
+    wetBuffer.setSize(preparedChannels, samplesPerBlock, false, false, true);
+    wetBuffer.clear();
     
     maxDelaySamples = static_cast<int>(sampleRate * 2.0); 
     maxHoldSamples = static_cast<int>(sampleRate * 1.0);  
     delayBuffer.setSize(numChannels, maxDelaySamples);
     holdBuffer.setSize(numChannels, maxHoldSamples);
     loopBuffer.setSize(numChannels, (int)(sampleRate * 60.0)); 
-    mdlBuffer.setSize(numChannels, 16384); 
     
-    delayBuffer.clear(); holdBuffer.clear(); loopBuffer.clear(); mdlBuffer.clear();
-    writeIdx = 0; holdWriteIdx = 0; mdlWriteIdx = 0; mdlPhase = 0.0f; mdlPhase2 = 0.0f; mdlPhase3 = 0.0f;
+    delayBuffer.clear(); holdBuffer.clear(); loopBuffer.clear(); 
+    holdWriteIdx = 0; mdlPhase = 0.0f; mdlPhase2 = 0.0f; mdlPhase3 = 0.0f;
+    recordedSamples = 0;
+    grainClock = 0.0f;
+    stepCount = 0;
+    envFollower = 0.0f;
+    transientDetected = false;
     holdLocked = false;
 
-    juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
+    juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
+
+    // Máximo delay = modDepth máximo (50ms) + margen
+    const int maxMdlDelaySamples = (int)(sampleRate * 0.1); // 100ms de margen
+    mdlDelayL.prepare(spec);
+    mdlDelayL.setMaximumDelayInSamples(maxMdlDelaySamples);
+    mdlDelayR.prepare(spec);
+    mdlDelayR.setMaximumDelayInSamples(maxMdlDelaySamples);
     fxChain.prepare(spec);
     
     diffusers.clear(); diffuserPhases.assign(numDiffusers, 0.0f);
@@ -55,6 +68,32 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     grainFilters.assign(64, std::vector<FilterState>(numChannels));
     currentActiveGrainCount = 0.0f; interruptGate = 1.0f; interruptTimer = 0;
     for (auto& g : grains) g.active = false;
+
+    grains.resize(64);
+
+    activeGrainIndices.clear();
+    freeGrainIndices.clear();
+    activeGrainIndices.reserve((int)grains.size());
+    freeGrainIndices.reserve((int)grains.size());
+
+    for (int i = 0; i < (int)grains.size(); ++i)
+    {
+        grains[i].active = false;
+        freeGrainIndices.push_back(i);
+    }
+
+    currentActiveGrainCount = 0.0f;
+    interruptGate = 1.0f;
+    interruptTimer = 0;
+
+    pLooperQuant = apvts.getRawParameterValue("LOOPER_QUANT");
+    pLooperRepeats = apvts.getRawParameterValue("REPEATS");
+    pLooperSpray = apvts.getRawParameterValue("SPRAY");
+    pLooperRev = apvts.getRawParameterValue("LOOPER_REV");
+    pLooperSpread = apvts.getRawParameterValue("SPREAD");
+    pLooperPitchJitter = apvts.getRawParameterValue("PITCH_JITTER");
+    pLooperRevProb = apvts.getRawParameterValue("REV_PROB");
+    pLooperWindowType = apvts.getRawParameterValue("WINDOW_TYPE");
 }
 
 float GranularEngine::getNextSampleCubic(int channel, float readPos) {
@@ -83,15 +122,15 @@ void GranularEngine::updateEnvelopeFollower(const juce::AudioBuffer<float>& buff
     prevEnv = envFollower;
 }
 
-void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, juce::AudioProcessorValueTreeState& apvts) {
-    bool globalRev = apvts.getRawParameterValue("LOOPER_REV")->load() > 0.5f;
-    bool globalQuant = apvts.getRawParameterValue("LOOPER_QUANT")->load() > 0.5f;
-    float repeats = apvts.getRawParameterValue("REPEATS")->load();
-    float spray = apvts.getRawParameterValue("SPRAY")->load();
-    float spread = apvts.getRawParameterValue("SPREAD")->load();
-    float jitter = apvts.getRawParameterValue("PITCH_JITTER")->load();
-    float revProb = apvts.getRawParameterValue("REV_PROB")->load();
-    int globalWin = (int)apvts.getRawParameterValue("WINDOW_TYPE")->load();
+void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, int algo, int currentWriteIdx, const GrainParams& gp) {
+    bool globalRev = gp.globalRev;
+    bool globalQuant = gp.globalQuant;
+    float repeats = gp.repeats;
+    float spray = gp.spray;
+    float spread = gp.spread;
+    float jitter = gp.jitter;
+    float revProb = gp.revProb;
+    int globalWin = gp.globalWin;
 
     float samplesPerStep = (timeMs * (float)fs / 1000.0f) * 0.25f;
     if (samplesPerStep < 100.0f) samplesPerStep = 100.0f;
@@ -118,58 +157,62 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
 
     int spawnCount = (algo == 0 || algo == 3) ? (int)(1 + activity * 12.0f) : 1;
     for (int s = 0; s < spawnCount; ++s) {
-        for (int i = 0; i < (int)grains.size(); ++i) {
-            auto& g = grains[i];
-            if (!g.active) {
-                g.active = true; g.age = 0.0f; g.startSpeed = 1.0f; g.endSpeed = 1.0f;
-                g.internalPhase = dist(rng); 
-                g.reverse = (dist(rng) < revProb) ? !globalRev : globalRev; 
-                g.filterCutoff = 1.0f; g.bitCrush = 1.0f; g.isSustainer = false;
-                
-                float lenBase = timeMs * ((float)fs / 1000.0f) * (1.0f + activity * 1.5f);
-                float random_spread = (dist(rng) * 2.0f - 1.0f) * activity * 1000.0f;
-                float offset = dist(rng) * (float)fs * (0.1f + activity * 1.0f) + random_spread;
-                
-                offset += (dist(rng) * 2.0f - 1.0f) * spray * (float)fs * 0.5f;
-                g.pan = juce::jlimit(0.0f, 1.0f, 0.5f + (dist(rng) - 0.5f) * (spread + activity * 0.2f));
+        const int grainIndex = helpers.acquireFreeGrain(activeGrainIndices, freeGrainIndices, grains);
+        if (grainIndex < 0)
+            break; 
 
-                if (algo == 0) { 
-                    if (mode == 0) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f; 
-                    else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f; 
-                    else if (mode == 2) g.startSpeed = 2.0f; 
-                    else { float ss[]={0.5f, 1.0f, 2.0f, 4.0f}; g.startSpeed = ss[(int)(dist(rng)*4.0f)]; } 
-                    g.endSpeed = g.startSpeed; g.length = lenBase * (0.5f + repeats * 3.0f); 
-                } 
-                else if (algo == 1) { 
-                    g.length = lenBase * (0.25f + repeats * 2.0f); 
-                    if (mode == 0) { g.filterCutoff = 0.2f + (1.0f - activity) * 0.5f; offset = (float)(dist(rng) * samplesPerStep * 8.0f); } 
-                    else if (mode == 1) { g.startSpeed = (dist(rng) < activity) ? 0.5f : 1.0f; g.endSpeed = g.startSpeed; } 
-                }
-                else if (algo == 2) { 
-                    g.length = lenBase * (0.5f + repeats * 10.0f); 
-                    float depthSemi = (mode == 1) ? 12.0f : 6.0f;
-                    g.startSpeed = (mode == 0) ? 0.75f : (mode == 2 ? 1.5f : 1.0f); 
-                    g.endSpeed = depthSemi; 
-                    g.filterCutoff = 0.85f - (activity * 0.3f);
-                }
-                
-                g.length = std::max(100.0f, std::min(g.length, (float)maxDelaySamples - 100.0f));
+        auto& g = grains[(size_t)grainIndex];
+        g.active = true; g.age = 0.0f; g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+        g.internalPhase = dist(rng);
+        g.reverse = (dist(rng) < revProb) ? !globalRev : globalRev;
+        g.filterCutoff = 1.0f; g.bitCrush = 1.0f; g.isSustainer = false;
 
-                if (jitter > 0.05f) {
-                    float jOff = (dist(rng) * 2.0f - 1.0f) * jitter; 
-                    float multiplier = std::pow(2.0f, jOff / 12.0f);
-                    g.startSpeed *= multiplier;
-                }
-                
-                offset += 0.0075f * (float)fs; 
-                g.currentPos = (float)currentWriteIdx - offset; 
-                while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples; 
-                while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
-                g.startPos = g.currentPos;
-                g.windowType = (globalWin > 0) ? globalWin - 1 : mode; 
-                for (auto& f : grainFilters[i]) { f.x1 = 0; f.y1 = 0; } break;
-            }
+        float lenBase = timeMs * ((float)fs / 1000.0f) * (1.0f + activity * 1.5f);
+        float random_spread = (dist(rng) * 2.0f - 1.0f) * activity * 1000.0f;
+        float offset = dist(rng) * (float)fs * (0.1f + activity * 1.0f) + random_spread;
+
+        offset += (dist(rng) * 2.0f - 1.0f) * spray * (float)fs * 0.5f;
+        g.pan = juce::jlimit(0.0f, 1.0f, 0.5f + (dist(rng) - 0.5f) * (spread + activity * 0.2f));
+
+        if (algo == 0) {
+            if (mode == 0) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f;
+            else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f;
+            else if (mode == 2) g.startSpeed = 2.0f;
+            else { float ss[] = { 0.5f, 1.0f, 2.0f, 4.0f }; g.startSpeed = ss[(int)(dist(rng) * 4.0f)]; }
+            g.endSpeed = g.startSpeed; g.length = lenBase * (0.5f + repeats * 3.0f);
         }
+        else if (algo == 1) {
+            g.length = lenBase * (0.25f + repeats * 2.0f);
+            if (mode == 0) { g.filterCutoff = 0.2f + (1.0f - activity) * 0.5f; offset = (float)(dist(rng) * samplesPerStep * 8.0f); }
+            else if (mode == 1) { g.startSpeed = (dist(rng) < activity) ? 0.5f : 1.0f; g.endSpeed = g.startSpeed; }
+        }
+        else if (algo == 2) {
+            g.length = lenBase * (0.5f + repeats * 10.0f);
+            float depthSemi = (mode == 1) ? 12.0f : 6.0f;
+            g.startSpeed = (mode == 0) ? 0.75f : (mode == 2 ? 1.5f : 1.0f);
+            g.endSpeed = depthSemi;
+            g.filterCutoff = 0.85f - (activity * 0.3f);
+        }
+
+        g.length = std::max(100.0f, std::min(g.length, (float)maxDelaySamples - 100.0f));
+
+        if (jitter > 0.05f) {
+            float jOff = (dist(rng) * 2.0f - 1.0f) * jitter;
+            float multiplier = std::pow(2.0f, jOff / 12.0f);
+            g.startSpeed *= multiplier;
+        }
+
+        offset += 0.0075f * (float)fs;
+
+        const float availableHistory = (float)std::max(1, recordedSamples - 4);
+        offset = juce::jlimit(1.0f, availableHistory, offset);
+
+        g.currentPos = (float)currentWriteIdx - offset;
+        if (g.currentPos < 0.0f) g.currentPos += (float)maxDelaySamples;
+        else if (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+        g.startPos = g.currentPos;
+        g.windowType = (globalWin > 0) ? globalWin - 1 : mode;
+        for (auto& f : grainFilters[grainIndex]) { f.x1 = 0; f.y1 = 0; };
     }
 }
 
@@ -194,12 +237,25 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     smoothRevProb.setTargetValue(apvts.getRawParameterValue("REV_PROB")->load());
     smoothModRate.setTargetValue(apvts.getRawParameterValue("MOD_RATE")->load());
     smoothModDepth.setTargetValue(apvts.getRawParameterValue("MOD_DEPTH")->load());
-    
+
     int algo = (int)apvts.getRawParameterValue("ALGO")->load();
     bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
     
-    juce::AudioBuffer<float> wetBuffer(numChannels, numSamples); wetBuffer.clear();
-    
+    if (wetBuffer.getNumChannels() != numChannels || wetBuffer.getNumSamples() < numSamples)
+        wetBuffer.setSize(numChannels, numSamples, false, false, true);
+    wetBuffer.clear();
+
+    const GrainParams gp{
+        pLooperRev->load() > 0.5f,
+        pLooperQuant->load() > 0.5f,
+        pLooperRepeats->load(),
+        pLooperSpray->load(),
+        pLooperSpread->load(),
+        pLooperPitchJitter->load(),
+        pLooperRevProb->load(),
+        pLooperWindowType->load()
+    };
+
     for (int i = 0; i < numSamples; ++i) {
         float timeVal = smoothTime.getNextValue(), effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
         float activityVal = smoothActivity.getNextValue();
@@ -214,43 +270,50 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         
         float compoundLfo = (std::sin(mdlPhase) + 0.4f * std::sin(mdlPhase * 2.0f + 0.5f)) * (0.7f + 0.3f * std::sin(mdlPhase2));
         float depthSamples = (modDepthVal * 50.0f / 1000.0f) * fs;
-        float currentMdlDelay = (depthSamples + 10.0f) + (compoundLfo * depthSamples);
-
-        scheduleGrains(activityVal, effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, apvts);
+        float currentMdlDelay = std::abs((depthSamples + 10.0f) + (compoundLfo * depthSamples));
+ 
+        scheduleGrains(activityVal, effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, gp);
         
         if (algo == 7) { 
             if (interruptTimer > 0) { interruptGate = juce::jmax(0.0f, interruptGate - 0.01f); interruptTimer--; } 
             else { interruptGate = juce::jmin(1.0f, interruptGate + 0.005f); } 
         } else { interruptGate = 1.0f; interruptTimer = 0; }
 
-        for (int gIdx = 0; gIdx < (int)grains.size(); ++gIdx) {
-            auto& g = grains[gIdx];
-            if (g.active) {
-                float phase = g.age / g.length;
-                float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase)); 
-                
-                float sL = getNextSampleCubic(0, g.currentPos) * window;
-                float sR = getNextSampleCubic(numChannels > 1 ? 1 : 0, g.currentPos) * window;
-                
-                wetBuffer.addSample(0, i, sL * (1.0f - g.pan)); 
-                if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan);
-                
-                if (algo == 2) { 
-                    float triPhase = (g.age / fs) * (0.05f + activityVal * 4.0f) + g.internalPhase;
-                    float tri = 2.0f * std::abs(2.0f * (triPhase - std::floor(triPhase + 0.5f))) - 1.0f;
-                    float speedMultiplier = std::pow(2.0f, (tri * g.endSpeed) / 12.0f);
-                    float instSpeed = (g.reverse ? -g.startSpeed : g.startSpeed) * speedMultiplier;
-                    g.currentPos += instSpeed;
-                } else {
-                    g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
-                }
-                
-                while (g.currentPos < 0) g.currentPos += (float)maxDelaySamples;
-                while (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+        int activeGrainsThisSample = 0;
 
-                if (++g.age >= g.length) g.active = false;
+        for (int activePos = 0; activePos < (int)activeGrainIndices.size();)
+        {
+            const int grainIndex = activeGrainIndices[(size_t)activePos];
+            auto& g = grains[(size_t)grainIndex];
+            float phase = g.age / g.length;
+            float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase));
+
+            float sL = bufferReaders.getNextSampleLinear(0, g.currentPos, delayBuffer, maxDelaySamples) * window;
+            float sR = bufferReaders.getNextSampleLinear(numChannels > 1 ? 1 : 0, g.currentPos, delayBuffer, maxDelaySamples) * window;
+
+            wetBuffer.addSample(0, i, sL * (1.0f - g.pan));
+            if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan);
+            ++activeGrainsThisSample;
+            if (algo == 2) {
+                float triPhase = (g.age / fs) * (0.05f + activityVal * 4.0f) + g.internalPhase;
+                float tri = 2.0f * std::abs(2.0f * (triPhase - std::floor(triPhase + 0.5f))) - 1.0f;
+                float speedMultiplier = std::pow(2.0f, (tri * g.endSpeed) / 12.0f);
+                float instSpeed = (g.reverse ? -g.startSpeed : g.startSpeed) * speedMultiplier;
+                g.currentPos += instSpeed;
             }
+            else {
+                g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
+            }
+
+            if (g.currentPos < 0.0f) g.currentPos += (float)maxDelaySamples;
+            else if (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+            if (++g.age >= g.length) {
+                helpers.releaseActiveGrainByActiveListPosition(activeGrainIndices, freeGrainIndices, grains, activePos);
+                continue;
+            }
+            ++activePos;
         }
+        currentActiveGrainCount = (float)activeGrainsThisSample;
 
         float mix = smoothMix.getNextValue(), gain = smoothGain.getNextValue();
         float masterWet = smoothMasterWetVol.getNextValue();
@@ -261,34 +324,28 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             float dryInput = buffer.getSample(ch, i);
             float rawWet = wetBuffer.getSample(ch, i) * masterWet;
             
-            mdlBuffer.setSample(ch, mdlWriteIdx, rawWet);
-            float mdlReadPos = (float)mdlWriteIdx - currentMdlDelay;
-            while (mdlReadPos < 0) mdlReadPos += 16384.0f;
-            while (mdlReadPos >= 16384.0f) mdlReadPos -= 16384.0f;
-            
-            int i0 = (int)std::floor(mdlReadPos);
-            float f = mdlReadPos - (float)i0;
-            auto getMdl = [&](int idx) { int p = idx % 16384; if (p < 0) p += 16384; return mdlBuffer.getSample(ch, p); };
-            float m0 = getMdl(i0 - 1), m1 = getMdl(i0), m2 = getMdl(i0 + 1), m3 = getMdl(i0 + 2);
-            float a0 = -0.5f*m0 + 1.5f*m1 - 1.5f*m2 + 0.5f*m3, a1 = m0 - 2.5f*m1 + 2.0f*m2 - 0.5f*m3, a2 = -0.5f*m0 + 0.5f*m2, a3 = m1;
-            float wet = a0*f*f*f + a1*f*f + a2*f + a3;
+            auto& mdlDelay = (ch == 0) ? mdlDelayL : mdlDelayR;
+            mdlDelay.setDelay(currentMdlDelay);  // en samples, ya calculado
+            mdlDelay.pushSample(ch, rawWet);
+            float wet = mdlDelay.popSample(ch);
             if (!std::isfinite(wet)) wet = 0.0f;
             
             buffer.setSample(ch, i, (dryInput * (1.0f - mix) + wet * mix) * gain);
             
             if (!freeze) {
                 float fb = wet * repeats * 0.8f;
+                if (!std::isfinite(fb)) fb = 0.0f;
                 delayBuffer.setSample(ch, writeIdx, std::tanh(dryInput + fb));
             }
         }
-        mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
-        if (!freeze) writeIdx = (writeIdx + 1) % maxDelaySamples;
+        //mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
+        if (!freeze)
+        {
+            writeIdx = (writeIdx + 1) % maxDelaySamples;
+            recordedSamples = std::min(recordedSamples + 1, maxDelaySamples);
+        }
     }
     
-    for (int ch = 0; ch < numChannels; ++ch) {
-        float* data = buffer.getWritePointer(ch);
-        for (int s = 0; s < numSamples; ++s) if (!std::isfinite(data[s])) data[s] = 0.0f;
-    }
     juce::dsp::AudioBlock<float> outputBlock(buffer); 
     limiter.process(juce::dsp::ProcessContextReplacing<float>(outputBlock));
 }
