@@ -9,12 +9,14 @@ Cosmic Rays is a professional-grade granular processor for macOS and Linux, insp
 
 ## Key Features
 
-### 1. Advanced Granular DSP
+### 1. High-Performance Granular DSP
+- **O(1) Pool-Based Grain Management:** Optimized grain acquisition and release using an index-swapping pool system for ultra-low CPU overhead.
 - **Kinematic Grain Motion:** Grains follow ballistic trajectories ($x = x_0 + v_0t + 0.5at^2$), delivering liquid-smooth pitch glissandos without digital artifacts.
 - **Wah-Glide Model:** Sinusoidal internal pitch oscillation within each grain for organic, vocal-like movement.
 - **Microcosm-Style Algorithms:** 11 unique modes including Mosaic, Seq, Glide, and Strum, precisely tuned to hardware specifications.
 
 ### 2. Global Modulation Engine (MDL)
+- **JUCE-Optimized Delay Lines:** Integration with `juce::dsp::DelayLine` for stable, high-fidelity pitch modulation and vintage tape emulation.
 - **Prime-Ratio LFOs:** Summation of three oscillators at prime-number ratios for non-repeating, organic "tape drift."
 - **Broken Capstan Algorithm:** Asymmetrical LFO curves combined with deep delay lines (up to 50ms) simulate the lurching instability of failing tape motors.
 - **Musical Warble:** A high-range (up to 8Hz) vibrato stage with amplitude surging for nostalgic shimmer.
@@ -37,8 +39,8 @@ Cosmic Rays is a professional-grade granular processor for macOS and Linux, insp
 
 ## Build Requirements
 - **JUCE 8.0+**
-- **CMake 3.15+**
-- **Compiler:** Clang (macOS) or GCC (Linux) with C++17 support.
+- **CMake 3.15+** (or Projucer)
+- **Compiler:** Clang (macOS), GCC (Linux), or MSVC (Windows - VS2022) with C++17 support.
 
 ## License
 MIT
