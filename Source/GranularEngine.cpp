@@ -253,7 +253,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         pLooperSpread->load(),
         pLooperPitchJitter->load(),
         pLooperRevProb->load(),
-        pLooperWindowType->load()
+        (int)pLooperWindowType->load()
     };
 
     for (int i = 0; i < numSamples; ++i) {
