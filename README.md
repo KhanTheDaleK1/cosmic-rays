@@ -1,4 +1,4 @@
-# Cosmic Rays (Beta 3-10-2026)
+# Cosmic Rays (Beta 3-11-2026)
 
 **Official Website:** [beechem.site/cosmic-rays](https://beechem.site/cosmic-rays)
 

@@ -104,7 +104,7 @@ private:
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
     juce::Label cpuLabel, ramLabel;
 
-    juce::String currentVersion = "Beta 3-10-2026";
+    juce::String currentVersion = "Beta 3-11-2026";
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;

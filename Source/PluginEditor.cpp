@@ -78,7 +78,7 @@ HelpComponent::HelpComponent() {
     textEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     textEditor.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::plain));
     juce::String manual = 
-        "=== COSMIC RAYS OPERATING MANUAL (BETA 3-10-2026) ===\n\n"
+        "=== COSMIC RAYS OPERATING MANUAL (BETA 3-11-2026) ===\n\n"
         "1. CORE CONTROLS\n"
         "- ACTIVITY: Algorithm-specific density/complexity.\n"
         "- TIME: Grain length / repetition rate.\n"
@@ -492,7 +492,7 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
     g.setColour (juce::Colour (0xFF222222)); g.setFont (juce::FontOptions ("Helvetica", 30.0f, juce::Font::bold));
     g.drawFittedText ("COSMIC RAYS", headerArea.withTrimmedLeft(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredLeft, 1);
     g.setFont (juce::FontOptions ("Courier", 12.0f, juce::Font::plain));
-    g.drawFittedText ("BETA 3-10-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
+    g.drawFittedText ("BETA 3-11-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
     g.setColour(juce::Colour(0xFF444444)); g.setFont(juce::FontOptions ("Courier", 10.0f, juce::Font::bold));
     g.drawText("SYNC", shiftButton.getX(), shiftButton.getY() - 10, 50, 10, juce::Justification::centred);
     g.drawText("BEAT", tapButton.getX(), tapButton.getY() - 10, 50, 10, juce::Justification::centred);

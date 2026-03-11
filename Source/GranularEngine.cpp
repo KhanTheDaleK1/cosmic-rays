@@ -280,6 +280,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         } else { interruptGate = 1.0f; interruptTimer = 0; }
 
         int activeGrainsThisSample = 0;
+        float totalWindowPower = 0.0f;
 
         for (int activePos = 0; activePos < (int)activeGrainIndices.size();)
         {
@@ -287,12 +288,15 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             auto& g = grains[(size_t)grainIndex];
             float phase = g.age / g.length;
             float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase));
+            
+            totalWindowPower += window;
 
             float sL = bufferReaders.getNextSampleLinear(0, g.currentPos, delayBuffer, maxDelaySamples) * window;
             float sR = bufferReaders.getNextSampleLinear(numChannels > 1 ? 1 : 0, g.currentPos, delayBuffer, maxDelaySamples) * window;
 
             wetBuffer.addSample(0, i, sL * (1.0f - g.pan));
             if (numChannels > 1) wetBuffer.addSample(1, i, sR * g.pan);
+            
             ++activeGrainsThisSample;
             if (algo == 2) {
                 float triPhase = (g.age / fs) * (0.05f + activityVal * 4.0f) + g.internalPhase;
@@ -320,20 +324,25 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         float repeats = smoothRepeats.getNextValue();
         int activeChannels = std::min(numChannels, preparedChannels);
 
+        // Normalize the sum of grains to prevent feedback explosion
+        float normalization = totalWindowPower > 1.0f ? 1.0f / totalWindowPower : 1.0f;
+
         for (int ch = 0; ch < activeChannels; ++ch) {
             float dryInput = buffer.getSample(ch, i);
-            float rawWet = wetBuffer.getSample(ch, i) * masterWet;
+            float rawWet = wetBuffer.getSample(ch, i) * normalization;
             
             auto& mdlDelay = (ch == 0) ? mdlDelayL : mdlDelayR;
-            mdlDelay.setDelay(currentMdlDelay);  // en samples, ya calculado
+            mdlDelay.setDelay(currentMdlDelay);
             mdlDelay.pushSample(ch, rawWet);
             float wet = mdlDelay.popSample(ch);
             if (!std::isfinite(wet)) wet = 0.0f;
             
-            buffer.setSample(ch, i, (dryInput * (1.0f - mix) + wet * mix) * gain);
+            // Mix normalized wet signal with master wet volume
+            buffer.setSample(ch, i, (dryInput * (1.0f - mix) + (wet * masterWet) * mix) * gain);
             
             if (!freeze) {
-                float fb = wet * repeats * 0.8f;
+                // Feedback loop is now stable because 'wet' is normalized
+                float fb = wet * repeats * 0.98f; 
                 if (!std::isfinite(fb)) fb = 0.0f;
                 delayBuffer.setSample(ch, writeIdx, std::tanh(dryInput + fb));
             }
