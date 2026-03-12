@@ -10,8 +10,7 @@ Cosmic Rays is a professional-grade granular processor for macOS, Linux, and Win
 - **Analog VU Meter:** A classic needle-based meter for monitoring grain density.
 - **Physical Controls:** Mechanical-style push buttons with LED indicators and "putty grey" hardware knobs.
 
-<img width="660" height="494" alt="image" src="https://github.com/user-attachments/assets/bef1af24-72f3-439b-aff2-89b7f899e44a" />
-
+<img width="724" height="542" alt="image" src="https://github.com/user-attachments/assets/3193cff0-00e3-463f-ac2f-b1994c40d54a" />
 
 ## Key Features
 
