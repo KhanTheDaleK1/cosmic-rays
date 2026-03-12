@@ -10,49 +10,56 @@ public:
                            float rotaryStartAngle, float rotaryEndAngle, juce::Slider& slider) override;
     juce::Font getTextButtonFont (juce::TextButton&, int buttonHeight) override;
     
+    void drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
+                               bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+    
+    void drawToggleButton (juce::Graphics& g, juce::ToggleButton& button,
+                           bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+    
     struct Colors {
-        static inline const juce::Colour appleBeige   { 0xFFCECECE };
-        static inline const juce::Colour appleGreen   { 0xFF61BB46 };
-        static inline const juce::Colour appleYellow  { 0xFFFDB827 };
-        static inline const juce::Colour appleOrange  { 0xFFF58220 };
-        static inline const juce::Colour appleRed     { 0xFFE03A3E };
-        static inline const juce::Colour applePurple  { 0xFF963D97 };
-        static inline const juce::Colour appleBlue    { 0xFF009DDC };
+        static inline const juce::Colour agedPlastic  { 0xFFC5B381 };
+        static inline const juce::Colour puttyGrey     { 0xFFBDB7AB };
+        static inline const juce::Colour appleGreen    { 0xFF61BB46 };
+        static inline const juce::Colour appleYellow   { 0xFFFDB827 };
+        static inline const juce::Colour appleOrange   { 0xFFF58220 };
+        static inline const juce::Colour appleRed      { 0xFFE03A3E };
+        static inline const juce::Colour applePurple   { 0xFF963D97 };
+        static inline const juce::Colour appleBlue     { 0xFF009DDC };
         static inline const juce::Colour phosphorGreen { 0xFF33FF33 };
-        static inline const juce::Colour scopeBg      { 0xFF001100 };
+        static inline const juce::Colour scopeBg       { 0xFF000F00 };
     };
 };
 
 class FilterVisualizer : public juce::Component {
 public:
-    FilterVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
+    FilterVisualizer(CosmicRaysAudioProcessor& p) : audioProcessor(p) {}
     void paint(juce::Graphics& g) override;
 private:
-    CosmicRaysAudioProcessor& processor;
+    CosmicRaysAudioProcessor& audioProcessor;
 };
 
 class PitchVisualizer : public juce::Component {
 public:
-    PitchVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
+    PitchVisualizer(CosmicRaysAudioProcessor& p) : audioProcessor(p) {}
     void paint(juce::Graphics& g) override;
 private:
-    CosmicRaysAudioProcessor& processor;
+    CosmicRaysAudioProcessor& audioProcessor;
 };
 
 class DensityMeter : public juce::Component {
 public:
-    DensityMeter(CosmicRaysAudioProcessor& p) : processor(p) {}
+    DensityMeter(CosmicRaysAudioProcessor& p) : audioProcessor(p) {}
     void paint(juce::Graphics& g) override;
 private:
-    CosmicRaysAudioProcessor& processor;
+    CosmicRaysAudioProcessor& audioProcessor;
 };
 
 class WaveformVisualizer : public juce::Component {
 public:
-    WaveformVisualizer(CosmicRaysAudioProcessor& p) : processor(p) {}
+    WaveformVisualizer(CosmicRaysAudioProcessor& p) : audioProcessor(p) {}
     void paint(juce::Graphics& g) override;
 private:
-    CosmicRaysAudioProcessor& processor;
+    CosmicRaysAudioProcessor& audioProcessor;
 };
 
 class HelpComponent : public juce::Component {
@@ -79,7 +86,7 @@ public:
 
 private:
     CustomLookAndFeel customLookAndFeel;
-    CosmicRaysAudioProcessor& processor;
+    CosmicRaysAudioProcessor& audioProcessor;
 
     FilterVisualizer filterVis;
     PitchVisualizer pitchVis;
@@ -104,7 +111,7 @@ private:
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
     juce::Label cpuLabel, ramLabel;
 
-    juce::String currentVersion = "Beta 3-11-2026";
+    juce::String currentVersion = "Beta 3-12-2026";
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;
@@ -115,6 +122,9 @@ private:
     bool isShiftPressed = false;
     bool isFineMode = false;
     void updateLabels();
+
+    juce::Image plasticTexture;
+    void createPlasticTexture();
 
     // Tap Tempo State
     juce::Array<double> tapTimes;
