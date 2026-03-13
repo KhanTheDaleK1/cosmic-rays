@@ -175,33 +175,178 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         g.pan = juce::jlimit(0.0f, 1.0f, 0.5f + (dist(rng) - 0.5f) * (spread + activity * 0.2f));
 
         if (algo == 0) {
-            // Mosaic: Use octave-based speeds
-            if (mode == 0) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f;
-            else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f;
-            else if (mode == 2) g.startSpeed = 2.0f;
-            else { float ss[] = { 0.5f, 1.0f, 2.0f, 4.0f }; g.startSpeed = ss[(int)(dist(rng) * 4.0f)]; }
-            g.endSpeed = g.startSpeed; g.length = lenBase * (0.5f + repeats * 3.0f);
+            // Mosaic: Overlapping loops at different speeds
+            if (mode == 0)      g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f; // Normal / Double
+            else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f; // Normal / Half
+            else if (mode == 2) g.startSpeed = 2.0f;                             // Pure Octave Up
+            else { 
+                float ss[] = { 0.5f, 1.0f, 2.0f }; 
+                g.startSpeed = ss[(int)(dist(rng) * 3.0f)];                     // Massive Blend
+            }
+            g.endSpeed = g.startSpeed; 
+            g.length = lenBase * (0.8f + repeats * 4.0f);
         }
         else if (algo == 1) {
-            // Seq: Random octaves or fifths
-            g.length = lenBase * (0.25f + repeats * 2.0f);
-            if (mode == 0) { g.filterCutoff = 0.2f + (1.0f - activity) * 0.5f; offset = (float)(dist(rng) * samplesPerStep * 8.0f); }
-            else if (mode == 1) { 
-                float choices[] = { 0.5f, 0.75f, 1.0f, 1.5f }; // Octave down, 5th down, Unity, 5th up
-                g.startSpeed = choices[(int)(dist(rng) * 4.0f)]; 
-                g.endSpeed = g.startSpeed; 
+            // Seq: Rearranged rhythmic sequences
+            g.length = lenBase * (0.4f + repeats * 2.0f);
+            if (mode == 0) {
+                // Alternating normal/half (Activity = bounce)
+                g.startSpeed = (stepCount % 2 == 0) ? 1.0f : 0.5f;
+                if (dist(rng) > activity) g.startSpeed = 1.0f; // Stability override
             }
+            else if (mode == 1) {
+                // Arpeggiated sequence (major-ish intervals)
+                float arp[] = { 1.0f, 1.25f, 1.5f, 2.0f }; // 1, 3, 5, 8
+                g.startSpeed = arp[stepCount % 4];
+            }
+            else if (mode == 2) {
+                // Alternating shifts (Fifths / Complex)
+                g.startSpeed = (stepCount % 2 == 0) ? 1.5f : 1.0f; // 5th / Unity
+            }
+            else {
+                // Random sequence steps
+                float choices[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f };
+                g.startSpeed = choices[(int)(dist(rng) * 6.0f)];
+            }
+            g.endSpeed = g.startSpeed;
         }
         else if (algo == 2) {
-            // Glide: Exponential semitone glide
-            g.length = lenBase * (0.5f + repeats * 10.0f);
-            float startSemi = (mode == 0) ? -12.0f : (mode == 2 ? 7.0f : 0.0f);
-            float endSemi = (mode == 1) ? 12.0f : (mode == 3 ? -24.0f : 0.0f);
+            // Glide: Pitch shifting over time
+            g.length = lenBase * (1.0f + repeats * 8.0f);
+            if (mode == 0) { g.startSpeed = 1.0f; g.endSpeed = 0.5f; } // Downward
+            else if (mode == 1) { g.startSpeed = 1.0f; g.endSpeed = 2.0f; } // Upward
+            else if (mode == 2) { 
+                // Simultaneous Up/Down
+                bool up = dist(rng) < 0.5f;
+                g.startSpeed = 1.0f; g.endSpeed = up ? 1.2f : 0.8f; 
+            }
+            else {
+                // Stepped Pitch Bending
+                float intervals[] = { 1.0f, 1.25f, 1.5f, 2.0f, 1.0f, 0.75f, 0.5f };
+                g.startSpeed = intervals[stepCount % 7];
+                g.endSpeed = g.startSpeed; // No smooth glide in Mode D
+            }
+        }
+        else if (algo == 3) {
+            // Haze: Atmospheric clouds
+            g.length = lenBase * (1.5f + repeats * 5.0f);
+            if (mode == 0)      g.startSpeed = 1.0f; 
+            else if (mode == 1) g.startSpeed = (dist(rng) < 0.6f) ? 0.5f : 1.0f; // Lower octave mix
+            else if (mode == 2) g.startSpeed = (dist(rng) < 0.6f) ? 2.0f : 1.0f; // Higher octave mix
+            else {
+                float ss[] = { 0.5f, 1.0f, 2.0f };
+                g.startSpeed = ss[(int)(dist(rng) * 3.0f)]; // Morphing high/low
+            }
+            g.endSpeed = g.startSpeed;
+            g.filterCutoff = 0.5f + (1.0f - activity) * 0.4f;
+        }
+        else if (algo == 4) {
+            // Tunnel: Resonant drones
+            g.length = lenBase * (4.0f + repeats * 10.0f);
+            if (mode == 0)      g.startSpeed = 1.0f;
+            else if (mode == 1) g.startSpeed = 0.5f; // Sub-harmonics
+            else if (mode == 2) {
+                // Pulsing tremolo via length modulation
+                g.length *= (0.8f + 0.4f * std::sin(grainClock * 0.1f));
+                g.startSpeed = 1.0f;
+            }
+            else {
+                // Evolving (drifting pitch)
+                g.startSpeed = 1.0f + (std::sin(grainClock * 0.05f) * 0.05f);
+            }
+            g.endSpeed = g.startSpeed;
+        }
+        else if (algo == 5) {
+            // Strum: Pointillistic plucked textures
+            g.length = 1500.0f + (activity * 3000.0f); // Short, plucked
+            if (mode == 0)      g.startSpeed = 1.0f;
+            else if (mode == 1) g.startSpeed = 0.5f; // Bass plucks
+            else if (mode == 2) g.startSpeed = 2.0f; // Mandolin / High plucks
+            else {
+                float ss[] = { 0.5f, 1.0f, 2.0f, 4.0f };
+                g.startSpeed = ss[(int)(dist(rng) * 4.0f)]; // Random octaves
+            }
+            g.endSpeed = g.startSpeed;
+            g.windowType = 2; // Sharp attack (Percussive)
+        }
+        else if (algo == 6) {
+            // Blocks: Predictable glitches
+            g.length = samplesPerStep * (0.5f + activity); 
+            if (mode == 0)      g.startSpeed = 1.0f;
+            else if (mode == 1) g.startSpeed = 0.5f; // Pitched down
+            else if (mode == 2) g.startSpeed = 2.0f; // Pitched up
+            else {
+                g.startSpeed = (dist(rng) < 0.5f) ? 1.5f : 1.0f;
+                g.reverse = (dist(rng) < 0.3f); // Max chaos
+            }
+            g.endSpeed = g.startSpeed;
+            g.windowType = 3; // Square/Block window
+        }
+        else if (algo == 7) {
+            // Interrupt: Sparse signal replacements
+            g.length = lenBase * 0.5f;
+            if (mode == 0)      { g.startSpeed = 1.0f; }
+            else if (mode == 1) { g.startSpeed = 1.0f; g.filterCutoff = 0.2f; } // Muffled
+            else if (mode == 2) { g.startSpeed = 1.0f; g.filterCutoff = 0.8f; g.brightness = 2.0f; } // Tinny (HPF-like)
+            else {
+                g.startSpeed = (dist(rng) < 0.5f) ? 0.5f : 2.0f; // Montage
+                g.length *= 0.5f;
+            }
+            g.endSpeed = g.startSpeed;
+        }
+        else if (algo == 8) {
+            // Arp: Sequenced runs
+            g.length = lenBase * 0.3f;
+            if (mode == 0) {
+                // Rising/Falling
+                float seq[] = { 1.0f, 1.25f, 1.5f, 2.0f, 1.5f, 1.25f };
+                g.startSpeed = seq[stepCount % 6];
+            }
+            else if (mode == 1) {
+                // Major / Bright
+                float seq[] = { 1.0f, 1.25f, 1.5f, 1.875f }; // 1, 3, 5, 7
+                g.startSpeed = seq[stepCount % 4];
+            }
+            else if (mode == 2) {
+                // Minor / Dark
+                float seq[] = { 1.0f, 1.2f, 1.5f, 1.8f }; // 1, b3, 5, b7
+                g.startSpeed = seq[stepCount % 4];
+            }
+            else {
+                // Randomized "Drunk"
+                static int lastStep = 0;
+                lastStep = juce::jlimit(0, 7, lastStep + (dist(rng) < 0.5f ? -1 : 1));
+                float scales[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 4.0f };
+                g.startSpeed = scales[lastStep];
+            }
+            g.endSpeed = g.startSpeed;
+        }
+        else if (algo == 9) {
+            // Pattern: Rhythmic delay taps
+            g.length = lenBase * 0.5f;
+            if (mode == 0)      offset = samplesPerStep * 3.0f; // Dotted 8th sync
+            else if (mode == 1) offset = samplesPerStep * 0.666f; // Triplet gallop
+            else if (mode == 2) offset = samplesPerStep * (float)(stepCount % 4 + 1) * 0.5f; // Polyrhythmic
+            else                offset = (float)fs * 0.05f * (float)(dist(rng) * 10.0f); // Reverb-like wall
             
-            g.startSpeed = std::pow(2.0f, startSemi / 12.0f);
-            // endSpeed stores the ratio for exponential glide: start * ratio^(age/length)
-            g.endSpeed = std::pow(2.0f, (endSemi - startSemi) / 12.0f); 
-            g.filterCutoff = 0.85f - (activity * 0.3f);
+            g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+        }
+        else if (algo == 10) {
+            // Warp: Filtered/Pitched delays
+            g.length = lenBase * 0.8f;
+            if (mode == 0) { 
+                // Degraded filtering
+                g.filterCutoff = 0.4f; 
+                g.startSpeed = 1.0f; 
+            }
+            else if (mode == 1) { g.startSpeed = 1.0f; g.endSpeed = 0.95f; } // Melting down
+            else if (mode == 2) { g.startSpeed = 1.0f; g.endSpeed = 1.05f; } // Rising shimmer
+            else {
+                // Tape Warp (Wow/Flutter)
+                float flutter = std::sin(grainClock * 0.2f) * 0.02f;
+                g.startSpeed = 1.0f + flutter;
+            }
+            g.endSpeed = g.startSpeed;
         }
 
         g.length = std::max(100.0f, std::min(g.length, (float)maxDelaySamples - 100.0f));
@@ -317,6 +462,16 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
 
             float sL = bufferReaders.getNextSampleLinear(0, g.currentPos, delayBuffer, maxDelaySamples) * gainL;
             float sR = bufferReaders.getNextSampleLinear(numChannels > 1 ? 1 : 0, g.currentPos, delayBuffer, maxDelaySamples) * gainR;
+
+            // Apply Per-Grain Filtering (Simple 1-pole Lowpass)
+            auto& states = grainFilters[(size_t)grainIndex];
+            float lpAlpha = g.filterCutoff;
+            states[0].y1 = states[0].y1 + lpAlpha * (sL - states[0].y1);
+            sL = states[0].y1 * g.brightness;
+            if (numChannels > 1) {
+                states[1].y1 = states[1].y1 + lpAlpha * (sR - states[1].y1);
+                sR = states[1].y1 * g.brightness;
+            }
 
             currentSampleL += sL;
             if (numChannels > 1) currentSampleR += sR;

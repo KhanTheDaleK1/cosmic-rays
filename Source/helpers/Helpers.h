@@ -29,6 +29,11 @@ struct Grain {
     float filterRes = 0.0f;
     float bitCrush = 1.0f;      // 1.0 = no crush, < 1.0 = reduction
     bool isSustainer = false;   // Special flag for SEQ-mode sustain grains
+    
+    // 2026 Enhanced Fields
+    float targetPitch = 1.0f;
+    float brightness = 1.0f;
+    int customID = 0;           // For sequencing/arp steps
 };
 
 class Helpers {
