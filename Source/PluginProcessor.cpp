@@ -56,6 +56,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout CosmicRaysAudioProcessor::cr
     params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "SNAP_STRENGTH", 1 }, "Rhythmic Snap", 0.0f, 1.0f, 0.5f));
 
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "TEMPO_MODE", 1 }, "Tempo Sync", false));
+    params.push_back (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID { "BPM", 1 }, "Manual BPM", 30.0f, 300.0f, 120.0f));
     params.push_back (std::make_unique<juce::AudioParameterBool> (juce::ParameterID { "FREEZE", 1 }, "Freeze/Sustain", false));
     
     params.push_back (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "SUBDIV", 1 }, "Subdivision", 

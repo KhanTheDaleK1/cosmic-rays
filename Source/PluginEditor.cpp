@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "BinaryData.h"
 
 // Platform-specific headers for memory usage reporting
 #if JUCE_MAC
@@ -76,43 +77,52 @@ juce::Font CustomLookAndFeel::getTextButtonFont (juce::TextButton&, int) {
 void CustomLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
                                            bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
 {
-    auto bounds = button.getLocalBounds().toFloat().reduced (1.0f);
-    auto isToggle = button.getClickingTogglesState();
-    auto isOn = button.getToggleState();
+    auto bounds = button.getLocalBounds().toFloat();
+    auto isDown = shouldDrawButtonAsDown || button.getToggleState();
     
-    if (shouldDrawButtonAsDown || (isToggle && isOn))
-        g.setColour (juce::Colours::black.withAlpha (0.3f));
-    else
-        g.setColour (juce::Colours::black.withAlpha (0.15f));
-        
-    g.fillRoundedRectangle (bounds.translated (0, 1), 3.0f);
+    // 0. The "Socket": Draw the recessed hole the button sits in.
+    // This ensures no 'black holes' appear, and gives a mechanical depth.
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.fillRect(bounds.reduced(0.5f));
 
-    auto baseCol = backgroundColour.isTransparent() ? Colors::puttyGrey : backgroundColour;
-    
-    if (shouldDrawButtonAsDown || (isToggle && isOn))
+    // 1. Mechanical "Shift": If the button is 'pressed', we shift the drawing down
+    // to simulate the short-travel mechanical depth.
+    auto buttonFace = bounds.reduced(1.0f);
+    if (isDown) buttonFace = buttonFace.translated(0, 1.2f); 
+
+    // 2. The Keycap Body (Sharp Edges, slight bevel)
+    // We use puttyGrey directly to ensure it NEVER turns black.
+    g.setColour(Colors::puttyGrey); 
+    g.fillRect(buttonFace);
+
+    // 3. Two-Shot Molded Edge (High-contrast border)
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.drawRect(buttonFace, 1.0f);
+
+    // 4. LED Indicator (Top Right Corner)
+    auto text = button.getButtonText();
+    bool shouldShowLed = (button.getClickingTogglesState() || text == "TAP") 
+                         && text != "?" && text != "BUG" && text != "UNDO" && text != "REDO" && text != "UPDATE!";
+
+    if (shouldShowLed)
     {
-        g.setGradientFill (juce::ColourGradient (baseCol.darker (0.2f), 0, bounds.getY(),
-                                               baseCol.darker (0.1f), 0, bounds.getBottom(), false));
-    }
-    else
-    {
-        g.setGradientFill (juce::ColourGradient (baseCol.brighter (0.05f), 0, bounds.getY(),
-                                               baseCol.darker (0.05f), 0, bounds.getBottom(), false));
-    }
-    
-    g.fillRoundedRectangle (bounds, 2.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.3f));
-    g.drawRoundedRectangle (bounds, 2.0f, 1.0f);
-    
-    if (isToggle)
-    {
-        auto ledArea = bounds.removeFromTop (6).removeFromRight (6).translated (-2, 2);
-        g.setColour (isOn ? juce::Colours::red.brighter() : juce::Colours::darkred.darker());
-        g.fillEllipse (ledArea);
-        if (isOn) {
-            g.setColour (juce::Colours::white.withAlpha (0.4f));
-            g.fillEllipse (ledArea.reduced (1.5f));
+        auto ledArea = buttonFace.removeFromTop(6).removeFromRight(6).translated(-3, 3);
+        bool ledOn = button.getToggleState();
+        
+        if (ledOn) {
+            juce::Graphics::ScopedSaveState s(g);
+            g.setColour(juce::Colours::red.withAlpha(0.3f));
+            g.fillEllipse(ledArea.expanded(2.0f));
         }
+        
+        g.setColour(ledOn ? juce::Colours::red.brighter() : juce::Colours::black.withAlpha(0.2f));
+        g.fillEllipse(ledArea);
+    }
+
+    // 5. High-Contrast Bottom Shadow (Only visible when button is UP)
+    if (!isDown) {
+        g.setColour(juce::Colours::black.withAlpha(0.4f));
+        g.fillRect(buttonFace.getX(), buttonFace.getBottom() - 1.0f, buttonFace.getWidth(), 1.0f);
     }
 }
 
@@ -153,6 +163,7 @@ CustomLookAndFeel::CustomLookAndFeel() {
     setColour (juce::PopupMenu::highlightedTextColourId, juce::Colours::white);
     
     setColour (juce::TextButton::buttonColourId, Colors::puttyGrey);
+    setColour (juce::TextButton::buttonOnColourId, Colors::puttyGrey); // MUST set this to avoid black toggle
     setColour (juce::TextButton::textColourOffId, juce::Colour (0xFF111111));
     setColour (juce::TextButton::textColourOnId, juce::Colour (0xFF000000));
 }
@@ -165,7 +176,7 @@ HelpComponent::HelpComponent() {
     textEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     textEditor.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::plain));
     juce::String manual = 
-        "=== COSMIC RAYS OPERATING MANUAL (BETA 3-12-2026) ===\n\n"
+        "=== COSMIC RAYS OPERATING MANUAL (BETA 3-13-2026) ===\n\n"
         "1. CORE CONTROLS\n"
         "- ACTIVITY: Algorithm-specific density/complexity.\n"
         "- TIME: Grain length / repetition rate.\n"
@@ -291,14 +302,10 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     looperModeBox.setLookAndFeel(&customLookAndFeel);
     addAndMakeVisible (helpButton); helpButton.setButtonText ("?");
     helpButton.setLookAndFeel(&customLookAndFeel);
-    helpButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::puttyGrey.darker(0.2f));
-    helpButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
     helpButton.onClick = [this]() { helpOverlay.setVisible(!helpOverlay.isVisible()); if (helpOverlay.isVisible()) helpOverlay.toFront(false); };
     
     addAndMakeVisible (feedbackButton); feedbackButton.setButtonText ("BUG");
     feedbackButton.setLookAndFeel(&customLookAndFeel);
-    feedbackButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::puttyGrey.darker(0.2f));
-    feedbackButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
     feedbackButton.onClick = [this]() { 
         juce::String url = "https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?title=Feedback:%20" + currentVersion.replace(" ", "%20") + "&body=Please%20describe%20your%20issue%20or%20feedback%20below:%0A%0A";
         juce::URL(url).launchInDefaultBrowser(); 
@@ -306,8 +313,6 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
 
     addChildComponent (updateButton); updateButton.setButtonText ("UPDATE!");
     updateButton.setLookAndFeel(&customLookAndFeel);
-    updateButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::appleRed);
-    updateButton.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     updateButton.onClick = []() { juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases").launchInDefaultBrowser(); };
     
     juce::Thread::launch([this]() {
@@ -318,34 +323,31 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
         }
     });
 
-    addAndMakeVisible (shiftButton); shiftButton.setButtonText ("SHIFT");
+    addAndMakeVisible (shiftButton); shiftButton.setButtonText ("SYNC");
     shiftButton.setLookAndFeel(&customLookAndFeel);
-    shiftButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::puttyGrey.darker(0.1f));
-    shiftButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
+    shiftButton.setClickingTogglesState(true);
     shiftButton.onClick = [this]() {
         auto* param = audioProcessor.apvts.getParameter("TEMPO_MODE");
-        param->setValueNotifyingHost(param->getValue() > 0.5f ? 0.0f : 1.0f);
+        param->setValueNotifyingHost(shiftButton.getToggleState() ? 1.0f : 0.0f);
         updateLabels();
     };
     addAndMakeVisible (tapButton); tapButton.setButtonText ("TAP");
     tapButton.setLookAndFeel(&customLookAndFeel);
-    tapButton.setColour(juce::TextButton::buttonColourId, CustomLookAndFeel::Colors::puttyGrey.darker(0.1f));
-    tapButton.setColour(juce::TextButton::textColourOffId, juce::Colour(0xFF222222));
     tapButton.onClick = [this]() { handleTap(); };
     addAndMakeVisible (looperRecButton); looperRecButton.setButtonText ("REC");
     looperRecButton.setLookAndFeel(&customLookAndFeel);
-    looperRecButton.setClickingTogglesState(true); looperRecButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleRed.withAlpha(0.8f));
+    looperRecButton.setClickingTogglesState(true); 
     addAndMakeVisible (looperOdubButton); looperOdubButton.setButtonText ("DUB");
     looperOdubButton.setLookAndFeel(&customLookAndFeel);
-    looperOdubButton.setClickingTogglesState(true); looperOdubButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleOrange.withAlpha(0.8f));
+    looperOdubButton.setClickingTogglesState(true); 
     
     addAndMakeVisible (quantizeButton); quantizeButton.setButtonText ("QUANT");
     quantizeButton.setLookAndFeel(&customLookAndFeel);
-    quantizeButton.setClickingTogglesState(true); quantizeButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleBlue.withAlpha(0.6f));
+    quantizeButton.setClickingTogglesState(true); 
     
     addAndMakeVisible (reverseButton); reverseButton.setButtonText ("REV");
     reverseButton.setLookAndFeel(&customLookAndFeel);
-    reverseButton.setClickingTogglesState(true); reverseButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleRed.withAlpha(0.6f));
+    reverseButton.setClickingTogglesState(true); 
     
     addAndMakeVisible (killDryButton); killDryButton.setButtonText ("KILL DRY");
     killDryButton.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
@@ -353,7 +355,7 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     trailsButton.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
     addAndMakeVisible (freezeButton); freezeButton.setButtonText ("FREEZE");
     freezeButton.setLookAndFeel(&customLookAndFeel);
-    freezeButton.setClickingTogglesState(true); freezeButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleBlue.withAlpha(0.8f));
+    freezeButton.setClickingTogglesState(true); 
 
     addAndMakeVisible (cpuLabel); cpuLabel.setFont (juce::FontOptions ("Courier", 10.0f, juce::Font::plain));
     cpuLabel.setColour (juce::Label::textColourId, juce::Colour (0xFF444444));
@@ -387,6 +389,7 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     startTimerHz(30); 
     setSize (800, 600); 
     createPlasticTexture();
+    logoImage = juce::ImageCache::getFromMemory(BinaryData::Logo_png, BinaryData::Logo_pngSize);
     updateLabels();
     setWantsKeyboardFocus(true);
 }
@@ -447,33 +450,26 @@ static void drawRoundScope(juce::Graphics& g, juce::Rectangle<float> bounds) {
     using C = CustomLookAndFeel::Colors;
     auto centre = bounds.getCentre();
     auto fullRadius = juce::jmin(bounds.getWidth(), bounds.getHeight()) / 2.0f;
+    auto circleBounds = juce::Rectangle<float>(centre.x - fullRadius, centre.y - fullRadius, fullRadius * 2.0f, fullRadius * 2.0f);
     
-    // 0. Soft Multi-layered Drop Shadow
-    for (int i = 1; i <= 3; ++i) {
-        g.setColour(juce::Colours::black.withAlpha(0.15f / (float)i));
-        g.fillEllipse(bounds.translated(0.0f, (float)i * 1.5f).expanded((float)i * 0.5f));
-    }
-
-    // 1. Chrome Bezel
+    // 1. Chrome Bezel (Simulating top-left light source)
     float bezelThickness = 6.0f;
-    juce::ColourGradient chrome(juce::Colours::white.withAlpha(0.9f), centre.x - fullRadius, centre.y - fullRadius,
-                                 juce::Colours::black.withAlpha(0.7f), centre.x + fullRadius, centre.y + fullRadius, false);
-    chrome.addColour(0.2, C::puttyGrey.brighter(0.4f));
-    chrome.addColour(0.45, juce::Colours::white);
-    chrome.addColour(0.55, C::puttyGrey.darker(0.3f));
-    chrome.addColour(0.8, C::puttyGrey.brighter(0.2f));
+    juce::ColourGradient chrome(juce::Colours::white.withAlpha(0.8f), circleBounds.getX(), circleBounds.getY(),
+                                 juce::Colours::black.withAlpha(0.5f), circleBounds.getRight(), circleBounds.getBottom(), false);
+    chrome.addColour(0.3, C::puttyGrey.brighter(0.3f));
+    chrome.addColour(0.5, C::puttyGrey);
+    chrome.addColour(0.7, C::puttyGrey.darker(0.4f));
 
     g.setGradientFill(chrome);
-    g.drawEllipse(centre.x - fullRadius + bezelThickness/2.0f, 
-                  centre.y - fullRadius + bezelThickness/2.0f, 
-                  (fullRadius - bezelThickness/2.0f) * 2.0f, 
-                  (fullRadius - bezelThickness/2.0f) * 2.0f, 
-                  bezelThickness);
+    g.drawEllipse(circleBounds.reduced(bezelThickness/2.0f), bezelThickness);
                   
-    g.setColour(juce::Colours::white.withAlpha(0.3f));
-    g.drawEllipse(bounds.reduced(0.5f), 1.0f);
-    g.setColour(juce::Colours::black.withAlpha(0.4f));
-    g.drawEllipse(bounds.reduced(bezelThickness - 0.5f), 1.0f);
+    // Top-left shiny highlight
+    g.setColour(juce::Colours::white.withAlpha(0.4f));
+    g.drawEllipse(circleBounds.reduced(0.5f), 1.0f);
+    
+    // Bottom-right deep shadow (inner ring)
+    g.setColour(juce::Colours::black.withAlpha(0.3f));
+    g.drawEllipse(circleBounds.reduced(bezelThickness - 0.5f), 1.0f);
 
     // 2. Inner Black Screen
     float screenRadius = fullRadius - bezelThickness;
@@ -709,10 +705,37 @@ void WaveformVisualizer::paint(juce::Graphics& g) {
 }
 
 void CosmicRaysAudioProcessorEditor::handleTap() {
+    // If Host Sync is active, ignore manual taps entirely
+    bool isSyncOn = audioProcessor.apvts.getRawParameterValue("TEMPO_MODE")->load() > 0.5f;
+    if (isSyncOn) return;
+
     double now = juce::Time::getMillisecondCounterHiRes();
-    if (tapTimes.size() > 0 && (now - tapTimes.getLast()) > 2000.0) tapTimes.clear();
-    tapTimes.add(now); if (tapTimes.size() > 4) tapTimes.remove(0);
-    if (tapTimes.size() >= 2) audioProcessor.apvts.getParameter("TEMPO_MODE")->setValueNotifyingHost(1.0f);
+    
+    // Clear taps if it's been more than 2 seconds since the last one
+    if (tapTimes.size() > 0 && (now - tapTimes.getLast()) > 2000.0) 
+        tapTimes.clear();
+        
+    tapTimes.add(now); 
+    
+    // Keep only the last 4 taps for moving average
+    if (tapTimes.size() > 4) 
+        tapTimes.remove(0);
+
+    if (tapTimes.size() >= 2) {
+        double totalInterval = 0;
+        for (int i = 1; i < tapTimes.size(); ++i)
+            totalInterval += (tapTimes[i] - tapTimes[i-1]);
+            
+        double avgInterval = totalInterval / (double)(tapTimes.size() - 1);
+        float bpm = (float)(60000.0 / avgInterval);
+        
+        auto* bpmParam = audioProcessor.apvts.getParameter("BPM");
+        bpmParam->setValueNotifyingHost(bpmParam->getNormalisableRange().convertTo0to1(juce::jlimit(30.0f, 300.0f, bpm)));
+        
+        // Also enable Manual Tempo Mode (Tempo Sync Off)
+        audioProcessor.apvts.getParameter("TEMPO_MODE")->setValueNotifyingHost(0.0f);
+        updateLabels();
+    }
 }
 
 void CosmicRaysAudioProcessorEditor::timerCallback() {
@@ -728,6 +751,25 @@ void CosmicRaysAudioProcessorEditor::timerCallback() {
     time2xButton.setToggleState(timeVal >= 0.5f && timeVal < 0.7f, juce::dontSendNotification);
     time4xButton.setToggleState(timeVal >= 0.7f && timeVal < 0.9f, juce::dontSendNotification);
     time8xButton.setToggleState(timeVal >= 0.9f, juce::dontSendNotification);
+
+    // --- Tap Button LED Pulse ---
+    float bpm = audioProcessor.apvts.getRawParameterValue("BPM")->load();
+    bool isSyncOn = audioProcessor.apvts.getRawParameterValue("TEMPO_MODE")->load() > 0.5f;
+    
+    if (!isSyncOn) {
+        double msPerBeat = 60000.0 / bpm;
+        double now = juce::Time::getMillisecondCounterHiRes();
+        double phase = std::fmod(now, msPerBeat);
+        
+        // 100ms flash at start of each beat
+        tapButton.setToggleState(phase < 100.0, juce::dontSendNotification);
+    } else {
+        tapButton.setToggleState(false, juce::dontSendNotification);
+    }
+
+    float tempoMode = audioProcessor.apvts.getRawParameterValue("TEMPO_MODE")->load();
+    shiftButton.setToggleState(tempoMode > 0.5f, juce::dontSendNotification);
+
     cpuLabel.setText ("CPU: " + juce::String (audioProcessor.getCPUUsage(), 1) + "%", juce::dontSendNotification);
     ramLabel.setText ("RAM: " + juce::String (juce::roundToInt(getMemoryUsageInMB())) + "MB", juce::dontSendNotification);
     filterVis.repaint(); pitchVis.repaint(); densityMeter.repaint(); waveformVis.repaint(); repaint();
@@ -787,40 +829,50 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
     juce::Colour colors[] = { C::appleGreen, C::appleYellow, C::appleOrange, C::appleRed, C::applePurple, C::appleBlue };
     float rectW = stripeWidth / 6.0f;
     for (int i = 0; i < 6; ++i) { g.setColour (colors[i]); g.fillRect (i * rectW, stripeY, rectW, stripeHeight); }
-    g.setColour (juce::Colour (0xFF111111)); g.setFont (juce::FontOptions ("Helvetica", 30.0f, juce::Font::bold));
-    g.drawFittedText ("COSMIC RAYS", headerArea.withTrimmedLeft(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredLeft, 1);
+    
+    g.setColour (juce::Colour (0xFF111111)); // Set color for both Logo (if fallback) and Version Text
+    if (logoImage.isValid()) {
+        auto logoBounds = juce::Rectangle<float>(15, 8, 231, 58); // 5% larger (original was 220x55)
+        
+        // 1. Subtle Drop Shadow for depth
+        g.setColour(juce::Colours::black.withAlpha(0.4f));
+        g.fillRoundedRectangle(logoBounds.translated(1.5f, 2.0f), 6.0f);
+        
+        // 2. Main Logo with Rounded Corners
+        juce::Path logoClip;
+        logoBounds = logoBounds.reduced(0.5f); // Tiny reduction to hide edge artifacts
+        logoClip.addRoundedRectangle(logoBounds, 6.0f);
+        
+        g.saveState();
+        g.reduceClipRegion(logoClip);
+        g.drawImageWithin(logoImage, (int)logoBounds.getX(), (int)logoBounds.getY(), (int)logoBounds.getWidth(), (int)logoBounds.getHeight(), 
+                          juce::RectanglePlacement::xLeft | juce::RectanglePlacement::yMid | juce::RectanglePlacement::fillDestination);
+        g.restoreState();
+        
+        // 3. Bolted-on Bezel/Edge highlight
+        g.setColour(juce::Colours::white.withAlpha(0.15f));
+        g.drawRoundedRectangle(logoBounds, 6.0f, 1.0f);
+        g.setColour(juce::Colours::black.withAlpha(0.3f));
+        g.drawRoundedRectangle(logoBounds.translated(0, 0.5f), 6.0f, 0.5f);
+    } else {
+        g.setFont (juce::FontOptions ("Helvetica", 30.0f, juce::Font::bold));
+        g.drawFittedText ("COSMIC RAYS", headerArea.withTrimmedLeft(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredLeft, 1);
+    }
+    
     g.setFont (juce::FontOptions ("Courier", 12.0f, juce::Font::plain));
-    g.drawFittedText ("BETA 3-12-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
+    g.drawFittedText ("BETA 3-13-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
     g.setColour(juce::Colour(0xFF222222)); g.setFont(juce::FontOptions ("Courier", 10.0f, juce::Font::bold));
     g.drawText("SYNC", shiftButton.getX(), shiftButton.getY() - 10, 50, 10, juce::Justification::centred);
     g.drawText("BEAT", tapButton.getX(), tapButton.getY() - 10, 50, 10, juce::Justification::centred);
+
+    // --- High-Contrast Functional Labeling (Screen-printed look) ---
+    g.setColour(juce::Colours::black.withAlpha(0.6f));
+    g.setFont(juce::FontOptions ("Courier", 10.0f, juce::Font::bold));
+
+    auto recBounds = looperRecButton.getBounds();
+    g.drawText("OUT", recBounds.getX(), recBounds.getBottom() + 2, recBounds.getWidth(), 10, juce::Justification::centred);
+    g.drawText("IN", recBounds.getX(), recBounds.getY() - 12, recBounds.getWidth(), 10, juce::Justification::centred);
     
-    // --- Functional LEDs ---
-    auto drawLed = [&](juce::Rectangle<int> buttonBounds, bool isOn, juce::Colour onCol) {
-        auto ledRect = juce::Rectangle<float>(buttonBounds.getRight() + 4, buttonBounds.getY() + buttonBounds.getHeight()/2.0f - 4, 8, 8);
-        g.setColour(juce::Colours::black.withAlpha(0.2f));
-        g.fillEllipse(ledRect.translated(0, 1));
-        g.setColour(isOn ? onCol : onCol.darker(0.8f).withAlpha(0.3f));
-        g.fillEllipse(ledRect);
-        if (isOn) {
-            g.setColour(juce::Colours::white.withAlpha(0.3f));
-            g.fillEllipse(ledRect.reduced(2));
-        }
-    };
-
-    // 1. Sync/Tempo Mode LED
-    bool tempoMode = audioProcessor.apvts.getRawParameterValue("TEMPO_MODE")->load() > 0.5f;
-    drawLed(shiftButton.getBounds(), tempoMode, C::appleRed);
-
-    // 2. Tap Pulse LED (150ms flash)
-    bool tapPulse = false;
-    if (!tapTimes.isEmpty()) {
-        double lastTap = tapTimes.getLast();
-        double now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
-        if (now - lastTap < 0.15) tapPulse = true;
-    }
-    drawLed(tapButton.getBounds(), tapPulse, juce::Colours::white);
-
     if (isFineMode) {
         g.setColour(C::appleBlue); g.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::bold));
         g.drawText("FINE", getWidth() - 60, 10, 50, 20, juce::Justification::centredRight);

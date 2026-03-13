@@ -30,6 +30,12 @@ juce_add_plugin(CosmicRays
     LV2URI "https://beechen.site/plugins/cosmic-rays"
 )
 
+# --- Binary Data ---
+juce_add_binary_data(CosmicRaysData
+    SOURCES
+    Logo.png
+)
+
 # --- Sources ---
 target_sources(CosmicRays
     PRIVATE
@@ -58,6 +64,7 @@ target_compile_definitions(CosmicRays
 # --- Libraries ---
 target_link_libraries(CosmicRays
     PRIVATE
+    CosmicRaysData
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_gui_extra
