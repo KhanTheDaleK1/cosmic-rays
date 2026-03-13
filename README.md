@@ -1,4 +1,4 @@
-# Cosmic Rays (2026 Edition)
+# Cosmic Rays
 
 **Official Website:** [beechem.site/cosmic-rays](https://beechem.site/cosmic-rays)
 
