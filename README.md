@@ -6,19 +6,21 @@ Cosmic Rays is a professional-grade granular processor for macOS, Linux, and Win
 
 ## New Aesthetic: "The Time Machine" (Beta 3-12-2026)
 - **80s Hardware Housing:** A meticulously textured "aged plastic" enclosure with authentic orange-peel bumps, scratches, and tasteful cracking.
-- **Round 1950s Oscilloscopes:** Three round, phosphor-green displays for Waveform, Pitch Cloud, and Filter response.
-- **Analog VU Meter:** A classic needle-based meter for monitoring grain density.
-- **Physical Controls:** Mechanical-style push buttons with LED indicators and "putty grey" hardware knobs.
+- **Chrome-Accented Scopes:** Three round, phosphor-green displays for Waveform, Pitch Cloud, and Filter response, now featuring machined chrome bezels.
+- **Protruding Analog Meter:** A redesigned physical needle-based meter for monitoring grain density with realistic depth and glass lens reflections.
+- **Vertical Channel Strip Layout:** Controls are now logically organized into vertical functional columns (Source, Algo, Tone, Master) for intuitive "signal flow" operation.
+- **Global Chrome Border:** A 4px wide metallic chrome frame around the entire plugin window.
 
 <img width="724" height="542" alt="image" src="https://github.com/user-attachments/assets/3193cff0-00e3-463f-ac2f-b1994c40d54a" />
 
 ## Key Features
 
 ### 1. High-Performance Granular DSP
-- **O(1) Pool-Based Grain Management:** Optimized grain acquisition and release using an index-swapping pool system for ultra-low CPU overhead.
-- **Kinematic Grain Motion:** Grains follow ballistic trajectories ($x = x_0 + v_0t + 0.5at^2$), delivering liquid-smooth pitch glissandos without digital artifacts.
-- **Wah-Glide Model:** Sinusoidal internal pitch oscillation within each grain for organic, vocal-like movement.
-- **Hardware-Inspired Algorithms:** 11 unique modes including Mosaic, Seq, Glide, and Strum, precisely tuned to hardware specifications.
+- **256-Voice Grain Pool:** Expanded synthesis engine supporting up to 256 simultaneous grains for ultra-dense textures without voice stealing.
+- **Unity Gain Standard:** Hybrid Saturated Normalization (Linear normalization + Tanh safety stage) ensures that output volume always matches input volume regardless of density.
+- **Exponential Pitch Shifting:** All pitch modulations (Glide, Jitter, Drift) follow musical semitone scaling ($2^{n/12}$) for perfect harmonic consistency.
+- **O(1) Pool-Based Grain Management:** Optimized acquisition and release using an index-swapping pool system for ultra-low CPU overhead.
+- **Kinematic Grain Motion:** Grains follow ballistic trajectories, delivering liquid-smooth pitch glissandos without digital artifacts.
 
 ### 2. Global Modulation Engine (MDL)
 - **JUCE-Optimized Delay Lines:** Integration with `juce::dsp::DelayLine` for stable, high-fidelity pitch modulation and vintage tape emulation.

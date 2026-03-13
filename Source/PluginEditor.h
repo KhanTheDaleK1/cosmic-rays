@@ -101,9 +101,10 @@ private:
     juce::GroupComponent looperBox, timeBox, shapeBox;
     juce::TextButton helpButton, shiftButton, tapButton, looperRecButton, looperOdubButton, freezeButton; 
     juce::TextButton undoButton, redoButton, feedbackButton, updateButton;
+    juce::TextButton quantizeButton, reverseButton;
     juce::TextButton time1_4Button, time1_2Button, time1xButton, time2xButton, time4xButton, time8xButton;
     juce::TextButton shapeAButton, shapeBButton, shapeCButton, shapeDButton;
-    juce::ToggleButton quantizeButton, reverseButton, killDryButton, trailsButton;
+    juce::ToggleButton killDryButton, trailsButton;
 
     juce::Label activityLabel, repeatsLabel, filterLabel, spaceLabel, mixLabel, loopLevelLabel, algoLabel, gainLabel, looperModeLabel;
     juce::Label modRateLabel, modDepthLabel, killDryLabel, trailsLabel, sprayLabel, spreadLabel;

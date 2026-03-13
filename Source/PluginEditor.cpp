@@ -338,10 +338,15 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     addAndMakeVisible (looperOdubButton); looperOdubButton.setButtonText ("DUB");
     looperOdubButton.setLookAndFeel(&customLookAndFeel);
     looperOdubButton.setClickingTogglesState(true); looperOdubButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleOrange.withAlpha(0.8f));
+    
     addAndMakeVisible (quantizeButton); quantizeButton.setButtonText ("QUANT");
-    quantizeButton.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
+    quantizeButton.setLookAndFeel(&customLookAndFeel);
+    quantizeButton.setClickingTogglesState(true); quantizeButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleBlue.withAlpha(0.6f));
+    
     addAndMakeVisible (reverseButton); reverseButton.setButtonText ("REV");
-    reverseButton.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
+    reverseButton.setLookAndFeel(&customLookAndFeel);
+    reverseButton.setClickingTogglesState(true); reverseButton.setColour(juce::TextButton::buttonOnColourId, CustomLookAndFeel::Colors::appleRed.withAlpha(0.6f));
+    
     addAndMakeVisible (killDryButton); killDryButton.setButtonText ("KILL DRY");
     killDryButton.setColour(juce::ToggleButton::textColourId, juce::Colours::black);
     addAndMakeVisible (trailsButton); trailsButton.setButtonText ("TRAILS");
@@ -789,9 +794,33 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
     g.setColour(juce::Colour(0xFF222222)); g.setFont(juce::FontOptions ("Courier", 10.0f, juce::Font::bold));
     g.drawText("SYNC", shiftButton.getX(), shiftButton.getY() - 10, 50, 10, juce::Justification::centred);
     g.drawText("BEAT", tapButton.getX(), tapButton.getY() - 10, 50, 10, juce::Justification::centred);
+    
+    // --- Functional LEDs ---
+    auto drawLed = [&](juce::Rectangle<int> buttonBounds, bool isOn, juce::Colour onCol) {
+        auto ledRect = juce::Rectangle<float>(buttonBounds.getRight() + 4, buttonBounds.getY() + buttonBounds.getHeight()/2.0f - 4, 8, 8);
+        g.setColour(juce::Colours::black.withAlpha(0.2f));
+        g.fillEllipse(ledRect.translated(0, 1));
+        g.setColour(isOn ? onCol : onCol.darker(0.8f).withAlpha(0.3f));
+        g.fillEllipse(ledRect);
+        if (isOn) {
+            g.setColour(juce::Colours::white.withAlpha(0.3f));
+            g.fillEllipse(ledRect.reduced(2));
+        }
+    };
+
+    // 1. Sync/Tempo Mode LED
     bool tempoMode = audioProcessor.apvts.getRawParameterValue("TEMPO_MODE")->load() > 0.5f;
-    g.setColour(tempoMode ? C::appleRed : C::appleGreen); g.fillEllipse(shiftButton.getRight() + 3, shiftButton.getY() + 10, 8, 8);
-    g.setColour(ledOn ? juce::Colours::white : juce::Colours::darkgrey); g.fillEllipse(tapButton.getRight() + 3, tapButton.getY() + 10, 8, 8);
+    drawLed(shiftButton.getBounds(), tempoMode, C::appleRed);
+
+    // 2. Tap Pulse LED (150ms flash)
+    bool tapPulse = false;
+    if (!tapTimes.isEmpty()) {
+        double lastTap = tapTimes.getLast();
+        double now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
+        if (now - lastTap < 0.15) tapPulse = true;
+    }
+    drawLed(tapButton.getBounds(), tapPulse, juce::Colours::white);
+
     if (isFineMode) {
         g.setColour(C::appleBlue); g.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::bold));
         g.drawText("FINE", getWidth() - 60, 10, 50, 20, juce::Justification::centredRight);
@@ -820,32 +849,44 @@ void CosmicRaysAudioProcessorEditor::resized() {
     auto header = area.removeFromTop (80); 
     auto footer = area.removeFromBottom (110);
     
-    // 1. Header Buttons (Help, Bug, Update)
+    // 1. Header Buttons
     helpButton.setBounds(header.removeFromRight(30).removeFromTop(25).translated(0, 35));
     header.removeFromRight(5);
     feedbackButton.setBounds(header.removeFromRight(40).removeFromTop(25).translated(0, 35));
     header.removeFromRight(5);
     updateButton.setBounds(header.removeFromRight(75).removeFromTop(25).translated(0, 35));
     
-    // CPU/RAM Stats
     auto statsArea = header.removeFromRight(110).reduced(5, 10);
     cpuLabel.setBounds(statsArea.removeFromTop(20));
     ramLabel.setBounds(statsArea.removeFromTop(20));
 
-    // 2. Utility Row (Tools / Sync)
+    // 2. Utility Row (Sequential subtraction from 'area' to prevent overlap)
     auto utilityRow = area.removeFromTop(40);
-    undoButton.setBounds (utilityRow.removeFromLeft (65).reduced (2, 5));
-    redoButton.setBounds (utilityRow.removeFromLeft (65).reduced (2, 5));
-    windowTypeBox.setBounds (utilityRow.removeFromLeft (100).reduced (5, 5));
-    freezeButton.setBounds (utilityRow.removeFromLeft (90).reduced (5, 5));
     
-    shiftButton.setBounds (utilityRow.removeFromRight (90).reduced (5, 5));
-    tapButton.setBounds (utilityRow.removeFromRight (90).reduced (5, 5));
+    // Left Group (Tools)
+    undoButton.setBounds (utilityRow.removeFromLeft (60).reduced (2, 5));
+    redoButton.setBounds (utilityRow.removeFromLeft (60).reduced (2, 5));
+    utilityRow.removeFromLeft(5);
+    
+    // Calculations for Column alignment
+    int colW = area.getWidth() / 4;
+    
+    // Center-aligned with Column 2
+    utilityRow.removeFromLeft(colW - 125); // Skip Col 1 width minus undo/redo
+    algoBox.setBounds(utilityRow.removeFromLeft(colW).reduced(5, 5));
+    
+    // Right utility group
+    windowTypeBox.setBounds (utilityRow.removeFromLeft (95).reduced (2, 5));
+    freezeButton.setBounds (utilityRow.removeFromLeft (85).reduced (2, 5));
+    // looperOdubButton removed from here
+    
+    tapButton.setBounds (utilityRow.removeFromRight (65).reduced (2, 5));
+    shiftButton.setBounds (utilityRow.removeFromRight (75).reduced (2, 5));
 
-    // 3. Main Channel Strip Columns (The Core UI)
-    auto mainArea = area.reduced(0, 5);
-    int colW = mainArea.getWidth() / 4;
-    
+    // 3. Clear space between utility buttons and scopes
+    area.removeFromTop(20); 
+    auto mainArea = area; // Remaining space is exclusively for the channel strips
+
     auto setColComponent = [&](juce::Component& c, juce::Rectangle<int>& col, int height) {
         c.setBounds(col.removeFromTop(height).reduced(5));
     };
@@ -857,54 +898,80 @@ void CosmicRaysAudioProcessorEditor::resized() {
 
     // Column 1: TIME / BUFFER
     auto col1 = mainArea.removeFromLeft(colW);
-    setColComponent(waveformVis, col1, 150);
-    setColComponent(timeBox, col1, 100);
-    setupSliderInCol(activitySlider, activityLabel, col1.removeFromTop(100));
+    setColComponent(waveformVis, col1, 140);
+    auto tBoxRect = col1.removeFromTop(90).reduced(5);
+    timeBox.setBounds(tBoxRect);
+    auto tb = tBoxRect.reduced(10, 15);
+    int bh = tb.getHeight() / 2, bw = tb.getWidth() / 3;
+    auto t_row1 = tb.removeFromTop(bh);
+    time1_4Button.setBounds(t_row1.removeFromLeft(bw).reduced(2));
+    time1_2Button.setBounds(t_row1.removeFromLeft(bw).reduced(2));
+    time1xButton.setBounds(t_row1.reduced(2));
+    auto t_row2 = tb;
+    time2xButton.setBounds(t_row2.removeFromLeft(bw).reduced(2));
+    time4xButton.setBounds(t_row2.removeFromLeft(bw).reduced(2));
+    time8xButton.setBounds(t_row2.reduced(2));
+    setupSliderInCol(activitySlider, activityLabel, col1.removeFromTop(90));
 
     // Column 2: ALGO / GRAINS
     auto col2 = mainArea.removeFromLeft(colW);
-    setColComponent(pitchVis, col2, 150);
-    setColComponent(algoBox, col2, 40);
-    setColComponent(shapeBox, col2, 100);
+    setColComponent(pitchVis, col2, 140);
+    auto sBoxRect = col2.removeFromTop(90).reduced(5);
+    shapeBox.setBounds(sBoxRect);
+    auto sb = sBoxRect.reduced(10, 15);
+    int sbh = sb.getHeight() / 2, sbw = sb.getWidth() / 2;
+    auto s_row1 = sb.removeFromTop(sbh);
+    shapeAButton.setBounds(s_row1.removeFromLeft(sbw).reduced(2));
+    shapeBButton.setBounds(s_row1.reduced(2));
+    auto s_row2 = sb;
+    shapeCButton.setBounds(s_row2.removeFromLeft(sbw).reduced(2));
+    shapeDButton.setBounds(s_row2.reduced(2));
+    setupSliderInCol(loopLevelSlider, loopLevelLabel, col2.removeFromTop(90));
 
     // Column 3: FILTER / FEEDBACK
     auto col3 = mainArea.removeFromLeft(colW);
-    setColComponent(filterVis, col3, 150);
-    setupSliderInCol(filterSlider, filterLabel, col3.removeFromTop(100));
-    setupSliderInCol(repeatsSlider, repeatsLabel, col3.removeFromTop(100));
+    setColComponent(filterVis, col3, 140);
+    setupSliderInCol(filterSlider, filterLabel, col3.removeFromTop(90));
+    setupSliderInCol(repeatsSlider, repeatsLabel, col3.removeFromTop(90));
 
     // Column 4: OUTPUT / DENSITY
     auto col4 = mainArea;
-    setColComponent(densityMeter, col4, 150);
-    setupSliderInCol(spaceSlider, spaceLabel, col4.removeFromTop(100));
-    setupSliderInCol(mixSlider, mixLabel, col4.removeFromTop(100));
+    setColComponent(densityMeter, col4, 140);
+    setupSliderInCol(spaceSlider, spaceLabel, col4.removeFromTop(90));
+    setupSliderInCol(mixSlider, mixLabel, col4.removeFromTop(90));
 
-    // 4. Footer Area (Looper + Secondary Knobs)
-    auto footerLeft = footer.removeFromLeft(440); 
+    // 4. Footer Area
+    auto footerLeft = footer.removeFromLeft(320); 
     looperBox.setBounds(footerLeft.reduced(5, 5));
     auto looperArea = looperBox.getBounds().reduced(10, 20);
-    looperModeBox.setBounds (looperArea.removeFromLeft(90).reduced(0, 5));
-    looperRecButton.setBounds (looperArea.removeFromLeft(70).reduced(5, 5));
-    looperOdubButton.setBounds (looperArea.removeFromLeft(70).reduced(5, 5));
-    quantizeButton.setBounds (looperArea.removeFromLeft(90).reduced(5, 5));
-    reverseButton.setBounds (looperArea.removeFromLeft(90).reduced(5, 5));
+    looperModeBox.setBounds (looperArea.removeFromLeft(75).reduced(0, 5));
+    looperRecButton.setBounds (looperArea.removeFromLeft(55).reduced(5, 5));
+    looperOdubButton.setBounds (looperArea.removeFromLeft(55).reduced(5, 5)); 
+    
+    // Stack Quant and Rev buttons to ensure readability
+    auto toggleArea = looperArea.removeFromLeft(60);
+    quantizeButton.setBounds (toggleArea.removeFromTop(toggleArea.getHeight()/2).reduced(2));
+    reverseButton.setBounds (toggleArea.reduced(2));
     
     auto footerRight = footer;
-    gainSlider.setBounds (footerRight.removeFromRight (80).reduced (5, 10));
+    gainSlider.setBounds (footerRight.removeFromRight (85).reduced (5, 10)); 
     gainLabel.setBounds (gainSlider.getBounds().withTop(gainSlider.getBottom() - 15));
     
-    // Modulation & Precision Knobs (Small strip at the bottom)
-    spreadSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    // Width calibrated to fit exactly 6 knobs in remaining space
+    const int smallKnobW = 58;
+    const int spacer = 4;
+    
+    spreadSlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     spreadLabel.setBounds (spreadSlider.getBounds().withTop(spreadSlider.getBottom() - 12));
-    spraySlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    spraySlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     sprayLabel.setBounds (spraySlider.getBounds().withTop(spraySlider.getBottom() - 12));
-    revProbSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    revProbSlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     revProbLabel.setBounds (revProbSlider.getBounds().withTop(revProbSlider.getBottom() - 12));
-    jitterSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    jitterSlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     jitterLabel.setBounds (jitterSlider.getBounds().withTop(jitterSlider.getBottom() - 12));
-    modDepthSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    modDepthSlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     modDepthLabel.setBounds (modDepthSlider.getBounds().withTop(modDepthSlider.getBottom() - 12));
-    modRateSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    modRateSlider.setBounds (footerRight.removeFromRight (smallKnobW).reduced (spacer, 15));
     modRateLabel.setBounds (modRateSlider.getBounds().withTop(modRateSlider.getBottom() - 12));
     
     auto globalRow = footerRight.reduced(5, 10);
