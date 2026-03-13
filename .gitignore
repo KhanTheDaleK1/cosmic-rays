@@ -22,4 +22,8 @@ _deps/
 # JUCE
 JUCE/
 /JuceLibraryCode/
-/Builds/VisualStudio2022
+/Builds/VisualStudio20222/
+
+# Gemini
+GEMINI.md
+

@@ -443,23 +443,41 @@ static void drawRoundScope(juce::Graphics& g, juce::Rectangle<float> bounds) {
     auto centre = bounds.getCentre();
     auto fullRadius = juce::jmin(bounds.getWidth(), bounds.getHeight()) / 2.0f;
     
-    // 1. Silver Metal Ring (Bezel) - Sitting directly on the textured housing
+    // 0. Soft Multi-layered Drop Shadow
+    for (int i = 1; i <= 3; ++i) {
+        g.setColour(juce::Colours::black.withAlpha(0.15f / (float)i));
+        g.fillEllipse(bounds.translated(0.0f, (float)i * 1.5f).expanded((float)i * 0.5f));
+    }
+
+    // 1. Chrome Bezel
     float bezelThickness = 6.0f;
-    g.setColour(C::puttyGrey);
+    juce::ColourGradient chrome(juce::Colours::white.withAlpha(0.9f), centre.x - fullRadius, centre.y - fullRadius,
+                                 juce::Colours::black.withAlpha(0.7f), centre.x + fullRadius, centre.y + fullRadius, false);
+    chrome.addColour(0.2, C::puttyGrey.brighter(0.4f));
+    chrome.addColour(0.45, juce::Colours::white);
+    chrome.addColour(0.55, C::puttyGrey.darker(0.3f));
+    chrome.addColour(0.8, C::puttyGrey.brighter(0.2f));
+
+    g.setGradientFill(chrome);
     g.drawEllipse(centre.x - fullRadius + bezelThickness/2.0f, 
                   centre.y - fullRadius + bezelThickness/2.0f, 
                   (fullRadius - bezelThickness/2.0f) * 2.0f, 
                   (fullRadius - bezelThickness/2.0f) * 2.0f, 
                   bezelThickness);
                   
+    g.setColour(juce::Colours::white.withAlpha(0.3f));
+    g.drawEllipse(bounds.reduced(0.5f), 1.0f);
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.drawEllipse(bounds.reduced(bezelThickness - 0.5f), 1.0f);
+
     // 2. Inner Black Screen
     float screenRadius = fullRadius - bezelThickness;
     g.setColour(C::scopeBg);
     g.fillEllipse(centre.x - screenRadius, centre.y - screenRadius, screenRadius * 2.0f, screenRadius * 2.0f);
     
-    // 3. Subtle inner shadow on screen edge for depth
-    g.setColour(juce::Colours::black.withAlpha(0.4f));
-    g.drawEllipse(centre.x - screenRadius, centre.y - screenRadius, screenRadius * 2.0f, screenRadius * 2.0f, 1.5f);
+    // 3. Softer inner shadow for a natural glass edge
+    g.setColour(juce::Colours::black.withAlpha(0.45f));
+    g.drawEllipse(centre.x - screenRadius, centre.y - screenRadius, screenRadius * 2.0f, screenRadius * 2.0f, 2.0f);
 }
 
 void FilterVisualizer::paint(juce::Graphics& g) {
@@ -518,19 +536,32 @@ void PitchVisualizer::paint(juce::Graphics& g) {
     for (float y = inner.getY(); y < inner.getBottom(); y += inner.getHeight()/8.0f) g.drawHorizontalLine((int)y, inner.getX(), inner.getRight());
     
     float midY = inner.getCentreY();
-    auto& grains = audioProcessor.getGranularEngine().getGrains();
+    auto& engine = audioProcessor.getGranularEngine();
+    auto& grains = engine.getGrains();
+    auto& buffer = engine.getDelayBuffer();
+    int numSamples = buffer.getNumSamples();
+    
     int activeCount = 0;
-    for (auto& grain : grains) {
-        if (grain.active) {
-            float octave = std::log2(grain.startSpeed);
-            float x = inner.getX() + (grain.currentPos / (5.0f * 44100.0f)) * inner.getWidth();
-            while (x > inner.getRight()) x -= inner.getWidth();
-            while (x < inner.getX()) x += inner.getWidth();
-            float y = midY - (octave * inner.getHeight() * 0.25f);
-            float alpha = 1.0f - (grain.age / grain.length);
-            g.setColour(C::phosphorGreen.withAlpha(alpha));
-            g.fillEllipse(x - 3, y - 3, 6, 6);
-            activeCount++;
+    if (numSamples > 0) {
+        for (auto& grain : grains) {
+            if (grain.active) {
+                float octave = std::log2(grain.startSpeed);
+                // X position based on actual buffer size
+                float xNorm = grain.currentPos / (float)numSamples;
+                float x = inner.getX() + xNorm * inner.getWidth();
+                
+                // Wrap X inside the circular scope display
+                while (x > inner.getRight()) x -= inner.getWidth();
+                while (x < inner.getX()) x += inner.getWidth();
+                
+                // Y position scaled to fit +/- 3 octaves comfortably
+                float y = midY - (octave * inner.getHeight() * 0.15f);
+                float alpha = 1.0f - (grain.age / grain.length);
+                
+                g.setColour(C::phosphorGreen.withAlpha(alpha));
+                g.fillEllipse(x - 3, y - 3, 6, 6);
+                activeCount++;
+            }
         }
     }
 
@@ -541,49 +572,98 @@ void PitchVisualizer::paint(juce::Graphics& g) {
 }
 
 void DensityMeter::paint(juce::Graphics& g) {
+    using C = CustomLookAndFeel::Colors;
     auto bounds = getLocalBounds().toFloat();
-    g.setColour(juce::Colours::black.withAlpha(0.5f));
-    g.drawRoundedRectangle(bounds, 4.0f, 3.0f);
-    auto inner = bounds.reduced(3);
+    
+    // 0. Protrusion Shadow (Outer)
+    for (int i = 1; i <= 4; ++i) {
+        g.setColour(juce::Colours::black.withAlpha(0.12f / (float)i));
+        g.fillRoundedRectangle(bounds.translated(0.0f, (float)i * 1.0f).expanded((float)i * 0.4f), 4.0f);
+    }
+
+    // 1. Protruding Beveled Frame
+    juce::ColourGradient frameGrad(C::puttyGrey.brighter(0.5f), 0, 0, C::puttyGrey.darker(0.4f), 0, bounds.getHeight(), false);
+    g.setGradientFill(frameGrad);
+    g.fillRoundedRectangle(bounds, 4.0f);
+    
+    // Shiny Top Highlight
+    g.setColour(juce::Colours::white.withAlpha(0.6f));
+    g.drawRoundedRectangle(bounds.reduced(0.5f), 4.0f, 1.0f);
+
+    // 2. Paper Surface (Slightly reduced to show the frame edge)
+    auto inner = bounds.reduced(6);
     auto paperCol = juce::Colour(0xFFEEE5CC);
     g.setColour(paperCol);
     g.fillRoundedRectangle(inner, 2.0f);
     
-    auto arcBounds = inner.reduced(5).translated(0, 10);
+    // Subtle shadow around the paper to sit it into the frame
+    g.setColour(juce::Colours::black.withAlpha(0.15f));
+    g.drawRoundedRectangle(inner, 2.0f, 1.0f);
+
+    auto arcBounds = inner.reduced(5).translated(0, 12);
     float centerX = arcBounds.getCentreX();
-    float centerY = arcBounds.getBottom() + 15;
-    float outerRad = arcBounds.getWidth() * 0.85f;
+    float centerY = arcBounds.getBottom() + 18;
+    float outerRad = arcBounds.getWidth() * 0.88f;
+    
+    // 3. The Scale Arc
     juce::Path arc;
     arc.addCentredArc(centerX, centerY, outerRad, outerRad, 0.0f, -juce::MathConstants<float>::pi * 0.35f, juce::MathConstants<float>::pi * 0.35f, true);
     g.setColour(juce::Colours::black.withAlpha(0.6f));
     g.strokePath(arc, juce::PathStrokeType(1.5f));
     
-    // Centered label
-    g.setColour(juce::Colours::black.withAlpha(0.35f));
+    // Label
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
     g.setFont(juce::FontOptions ("Courier", 13.0f, juce::Font::bold));
-    g.drawText("DENSITY", inner, juce::Justification::centred);
+    g.drawText("DENSITY", inner.removeFromBottom(25), juce::Justification::centred);
     
+    // Ticks
     for (int i = 0; i <= 10; ++i) {
         float angle = -juce::MathConstants<float>::pi * 0.35f + (float)i/10.0f * juce::MathConstants<float>::pi * 0.7f;
         auto pivot = juce::Point<float>(centerX, centerY);
-        auto p1 = pivot.getPointOnCircumference(outerRad * 0.92f, angle);
-        auto p2 = pivot.getPointOnCircumference(outerRad * 1.0f, angle);
+        auto p1 = pivot.getPointOnCircumference(outerRad, angle);
+        auto p2 = pivot.getPointOnCircumference(outerRad + 6.0f, angle);
         g.setColour(i > 7 ? juce::Colours::red : juce::Colours::black);
         g.drawLine(p1.x, p1.y, p2.x, p2.y, 1.5f);
     }
     
+    // 4. The Needle
     float activeCount = audioProcessor.getGranularEngine().getActiveGrainCount();
-    float maxGrains = (float)audioProcessor.getGranularEngine().getGrains().size();
+    // Maximum capacity is now 256
+    float maxGrains = 256.0f; 
     float norm = juce::jlimit(0.0f, 1.0f, activeCount / maxGrains);
     float needleAngle = -juce::MathConstants<float>::pi * 0.35f + norm * juce::MathConstants<float>::pi * 0.7f;
+    
     auto needlePivot = juce::Point<float>(centerX, centerY);
-    auto needleTip = needlePivot.getPointOnCircumference(outerRad * 0.95f, needleAngle);
-    g.setColour(juce::Colours::black.withAlpha(0.2f));
-    g.drawLine(needlePivot.x + 1, needlePivot.y - 14, needleTip.x + 1, needleTip.y + 1, 2.0f);
+    auto needleTip = needlePivot.getPointOnCircumference(outerRad * 0.96f, needleAngle);
+    
+    // Needle Shadow
+    g.setColour(juce::Colours::black.withAlpha(0.25f));
+    g.drawLine(needlePivot.x + 1.5f, needlePivot.y - 13.5f, needleTip.x + 1.5f, needleTip.y + 1.5f, 2.0f);
+    
+    // Main Needle Body
     g.setColour(juce::Colours::red.darker(0.2f));
-    g.drawLine(needlePivot.x, needlePivot.y - 15, needleTip.x, needleTip.y, 2.0f);
+    g.drawLine(needlePivot.x, needlePivot.y - 15.0f, needleTip.x, needleTip.y, 2.0f);
+    
+    // Needle Hub
     g.setColour(juce::Colours::black);
     g.fillEllipse(needlePivot.x - 5, needlePivot.y - 20, 10, 10);
+    g.setColour(C::puttyGrey);
+    g.fillEllipse(needlePivot.x - 2, needlePivot.y - 17, 4, 4);
+
+    // 5. Glass Lens Reflection
+    juce::Path glassPath;
+    glassPath.addRoundedRectangle(inner, 2.0f);
+    g.saveState();
+    g.reduceClipRegion(glassPath);
+    
+    juce::ColourGradient glassGrad(juce::Colours::white.withAlpha(0.2f), inner.getX(), inner.getY(),
+                                   juce::Colours::transparentWhite, inner.getRight(), inner.getBottom(), false);
+    glassGrad.addColour(0.4, juce::Colours::white.withAlpha(0.08f));
+    glassGrad.addColour(0.5, juce::Colours::transparentWhite);
+    g.setGradientFill(glassGrad);
+    g.fillAll();
+    
+    g.restoreState();
 }
 
 void WaveformVisualizer::paint(juce::Graphics& g) {
@@ -716,34 +796,90 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
         g.setColour(C::appleBlue); g.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::bold));
         g.drawText("FINE", getWidth() - 60, 10, 50, 20, juce::Justification::centredRight);
     }
+
+    // --- Global Chrome Border ---
+    float borderThickness = 4.0f;
+    auto fullBounds = getLocalBounds().toFloat();
+    juce::ColourGradient chrome(juce::Colours::white.withAlpha(0.8f), 0, 0,
+                                 juce::Colours::black.withAlpha(0.6f), fullBounds.getWidth(), fullBounds.getHeight(), false);
+    chrome.addColour(0.2, C::puttyGrey.brighter(0.4f));
+    chrome.addColour(0.45, juce::Colours::white);
+    chrome.addColour(0.55, C::puttyGrey.darker(0.3f));
+    chrome.addColour(0.8, C::puttyGrey.brighter(0.2f));
+    
+    g.setGradientFill(chrome);
+    g.drawRect(fullBounds, borderThickness);
+    
+    // Inner bevel line for extra "machined" detail
+    g.setColour(juce::Colours::black.withAlpha(0.4f));
+    g.drawRect(fullBounds.reduced(borderThickness - 0.5f), 1.0f);
 }
 
 void CosmicRaysAudioProcessorEditor::resized() {
     auto area = getLocalBounds().reduced (15); 
     auto header = area.removeFromTop (80); 
     auto footer = area.removeFromBottom (110);
+    
+    // 1. Header Buttons (Help, Bug, Update)
     helpButton.setBounds(header.removeFromRight(30).removeFromTop(25).translated(0, 35));
     header.removeFromRight(5);
     feedbackButton.setBounds(header.removeFromRight(40).removeFromTop(25).translated(0, 35));
     header.removeFromRight(5);
     updateButton.setBounds(header.removeFromRight(75).removeFromTop(25).translated(0, 35));
-    auto controlHeader = area.removeFromTop(45);
-    algoBox.setBounds (controlHeader.removeFromLeft (180).reduced (5, 5));
-    undoButton.setBounds (controlHeader.removeFromLeft (65).reduced (2, 5));
-    redoButton.setBounds (controlHeader.removeFromLeft (65).reduced (2, 5));
-    windowTypeBox.setBounds (controlHeader.removeFromLeft (90).reduced (5, 5));
-    freezeButton.setBounds (controlHeader.removeFromLeft (90).reduced (5, 5));
-    tapButton.setBounds (controlHeader.removeFromRight (90).reduced (5, 5));
-    shiftButton.setBounds (controlHeader.removeFromRight (90).reduced (5, 5));
+    
+    // CPU/RAM Stats
     auto statsArea = header.removeFromRight(110).reduced(5, 10);
     cpuLabel.setBounds(statsArea.removeFromTop(20));
     ramLabel.setBounds(statsArea.removeFromTop(20));
-    auto visArea = area.removeFromTop(160).reduced(2);
-    int itemWidth = visArea.getWidth() / 4;
-    waveformVis.setBounds(visArea.removeFromLeft(itemWidth).reduced(4));
-    pitchVis.setBounds(visArea.removeFromLeft(itemWidth).reduced(4));
-    filterVis.setBounds(visArea.removeFromLeft(itemWidth).reduced(4));
-    densityMeter.setBounds(visArea.removeFromLeft(itemWidth).reduced(4));
+
+    // 2. Utility Row (Tools / Sync)
+    auto utilityRow = area.removeFromTop(40);
+    undoButton.setBounds (utilityRow.removeFromLeft (65).reduced (2, 5));
+    redoButton.setBounds (utilityRow.removeFromLeft (65).reduced (2, 5));
+    windowTypeBox.setBounds (utilityRow.removeFromLeft (100).reduced (5, 5));
+    freezeButton.setBounds (utilityRow.removeFromLeft (90).reduced (5, 5));
+    
+    shiftButton.setBounds (utilityRow.removeFromRight (90).reduced (5, 5));
+    tapButton.setBounds (utilityRow.removeFromRight (90).reduced (5, 5));
+
+    // 3. Main Channel Strip Columns (The Core UI)
+    auto mainArea = area.reduced(0, 5);
+    int colW = mainArea.getWidth() / 4;
+    
+    auto setColComponent = [&](juce::Component& c, juce::Rectangle<int>& col, int height) {
+        c.setBounds(col.removeFromTop(height).reduced(5));
+    };
+    
+    auto setupSliderInCol = [&](juce::Slider& s, juce::Label& l, juce::Rectangle<int> rect) {
+        s.setBounds (rect.withTrimmedBottom (20)); 
+        l.setBounds (rect.withTop (rect.getBottom() - 20));
+    };
+
+    // Column 1: TIME / BUFFER
+    auto col1 = mainArea.removeFromLeft(colW);
+    setColComponent(waveformVis, col1, 150);
+    setColComponent(timeBox, col1, 100);
+    setupSliderInCol(activitySlider, activityLabel, col1.removeFromTop(100));
+
+    // Column 2: ALGO / GRAINS
+    auto col2 = mainArea.removeFromLeft(colW);
+    setColComponent(pitchVis, col2, 150);
+    setColComponent(algoBox, col2, 40);
+    setColComponent(shapeBox, col2, 100);
+
+    // Column 3: FILTER / FEEDBACK
+    auto col3 = mainArea.removeFromLeft(colW);
+    setColComponent(filterVis, col3, 150);
+    setupSliderInCol(filterSlider, filterLabel, col3.removeFromTop(100));
+    setupSliderInCol(repeatsSlider, repeatsLabel, col3.removeFromTop(100));
+
+    // Column 4: OUTPUT / DENSITY
+    auto col4 = mainArea;
+    setColComponent(densityMeter, col4, 150);
+    setupSliderInCol(spaceSlider, spaceLabel, col4.removeFromTop(100));
+    setupSliderInCol(mixSlider, mixLabel, col4.removeFromTop(100));
+
+    // 4. Footer Area (Looper + Secondary Knobs)
     auto footerLeft = footer.removeFromLeft(440); 
     looperBox.setBounds(footerLeft.reduced(5, 5));
     auto looperArea = looperBox.getBounds().reduced(10, 20);
@@ -752,57 +888,28 @@ void CosmicRaysAudioProcessorEditor::resized() {
     looperOdubButton.setBounds (looperArea.removeFromLeft(70).reduced(5, 5));
     quantizeButton.setBounds (looperArea.removeFromLeft(90).reduced(5, 5));
     reverseButton.setBounds (looperArea.removeFromLeft(90).reduced(5, 5));
+    
     auto footerRight = footer;
     gainSlider.setBounds (footerRight.removeFromRight (80).reduced (5, 10));
     gainLabel.setBounds (gainSlider.getBounds().withTop(gainSlider.getBottom() - 15));
-    spreadSlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    spreadLabel.setBounds (spreadSlider.getBounds().withTop(spreadSlider.getBottom() - 15));
-    spraySlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    sprayLabel.setBounds (spraySlider.getBounds().withTop(spraySlider.getBottom() - 15));
-    revProbSlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    revProbLabel.setBounds (revProbSlider.getBounds().withTop(revProbSlider.getBottom() - 15));
-    jitterSlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    jitterLabel.setBounds (jitterSlider.getBounds().withTop(jitterSlider.getBottom() - 15));
-    modDepthSlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    modDepthLabel.setBounds (modDepthSlider.getBounds().withTop(modDepthSlider.getBottom() - 15));
-    modRateSlider.setBounds (footerRight.removeFromRight (60).reduced (2, 10));
-    modRateLabel.setBounds (modRateSlider.getBounds().withTop(modRateSlider.getBottom() - 15));
+    
+    // Modulation & Precision Knobs (Small strip at the bottom)
+    spreadSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    spreadLabel.setBounds (spreadSlider.getBounds().withTop(spreadSlider.getBottom() - 12));
+    spraySlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    sprayLabel.setBounds (spraySlider.getBounds().withTop(spraySlider.getBottom() - 12));
+    revProbSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    revProbLabel.setBounds (revProbSlider.getBounds().withTop(revProbSlider.getBottom() - 12));
+    jitterSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    jitterLabel.setBounds (jitterSlider.getBounds().withTop(jitterSlider.getBottom() - 12));
+    modDepthSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    modDepthLabel.setBounds (modDepthSlider.getBounds().withTop(modDepthSlider.getBottom() - 12));
+    modRateSlider.setBounds (footerRight.removeFromRight (55).reduced (2, 15));
+    modRateLabel.setBounds (modRateSlider.getBounds().withTop(modRateSlider.getBottom() - 12));
+    
     auto globalRow = footerRight.reduced(5, 10);
     killDryButton.setBounds (globalRow.removeFromLeft(90));
     trailsButton.setBounds (globalRow.removeFromLeft(90));
-    int kw = area.getWidth() / 4, kh = area.getHeight() / 2; 
-    auto r1 = area.removeFromTop (kh);
-    auto setSliderBounds = [&](juce::Slider& s, juce::Label& l, juce::Rectangle<int> rect) {
-        s.setBounds (rect.withTrimmedBottom (20)); l.setBounds (rect.withTop (rect.getBottom() - 20));
-    };
-    setSliderBounds (activitySlider, activityLabel, r1.removeFromLeft (kw).reduced (5));
-    auto timeArea = r1.removeFromLeft (kw).reduced (5);
-    timeBox.setBounds(timeArea);
-    auto tb = timeBox.getBounds().reduced(10, 20);
-    int bh = tb.getHeight() / 2, bw = tb.getWidth() / 3;
-    auto t_row1 = tb.removeFromTop(bh);
-    time1_4Button.setBounds(t_row1.removeFromLeft(bw).reduced(2));
-    time1_2Button.setBounds(t_row1.removeFromLeft(bw).reduced(2));
-    time1xButton.setBounds(t_row1.reduced(2));
-    auto t_row2 = tb;
-    time2xButton.setBounds(t_row2.removeFromLeft(bw).reduced(2));
-    time4xButton.setBounds(t_row2.removeFromLeft(bw).reduced(2));
-    time8xButton.setBounds(t_row2.reduced(2));
-    auto shapeArea = r1.removeFromLeft (kw).reduced (5);
-    shapeBox.setBounds(shapeArea);
-    auto sb = shapeBox.getBounds().reduced(10, 20);
-    int sbh = sb.getHeight() / 2, sbw = sb.getWidth() / 2;
-    auto s_row1 = sb.removeFromTop(sbh);
-    shapeAButton.setBounds(s_row1.removeFromLeft(sbw).reduced(2));
-    shapeBButton.setBounds(s_row1.reduced(2));
-    auto s_row2 = sb;
-    shapeCButton.setBounds(s_row2.removeFromLeft(sbw).reduced(2));
-    shapeDButton.setBounds(s_row2.reduced(2));
-    setSliderBounds (repeatsSlider, repeatsLabel, r1.reduced (5));
-    auto r2 = area;
-    setSliderBounds (filterSlider, filterLabel, r2.removeFromLeft (kw).reduced (5));
-    setSliderBounds (spaceSlider, spaceLabel, r2.removeFromLeft (kw).reduced (5));
-    setSliderBounds (mixSlider, mixLabel, r2.removeFromLeft (kw).reduced (5));
-    setSliderBounds (loopLevelSlider, loopLevelLabel, r2.reduced (5));
+
     helpOverlay.setBounds(getLocalBounds().reduced(40, 60));
 }
