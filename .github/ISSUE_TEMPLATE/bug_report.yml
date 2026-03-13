@@ -1,0 +1,54 @@
+name: "Bug Report"
+description: "Report a software bug or DSP artifact."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for reporting a bug in Cosmic Rays! Please provide as much detail as possible."
+  - type: input
+    id: version
+    attributes:
+      label: "Plugin Version"
+      placeholder: "e.g., 0.0.1 (Beta 3-12-2026)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Operating System"
+      options:
+        - macOS (Sequoia/15)
+        - Windows 11
+        - Linux (Ubuntu/Debian)
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: "Plugin Format"
+      options:
+        - VST3
+        - AU
+        - LV2
+        - Standalone
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: "Bug Description"
+      placeholder: "Describe what happened..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Reproduction Steps"
+      placeholder: "1. Load Cosmic Rays\n2. Turn 'Density' to max\n3. Observed behavior..."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs/Crash Reports"
+      render: shell
