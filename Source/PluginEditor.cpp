@@ -168,7 +168,7 @@ CustomLookAndFeel::CustomLookAndFeel() {
     setColour (juce::TextButton::textColourOnId, juce::Colour (0xFF000000));
 }
 
-HelpComponent::HelpComponent() {
+HelpComponent::HelpComponent(const juce::String& version) {
     addAndMakeVisible(textEditor);
     textEditor.setMultiLine(true); textEditor.setReadOnly(true); textEditor.setScrollbarsShown(true);
     textEditor.setCaretVisible(false); textEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colours::black);
@@ -176,7 +176,7 @@ HelpComponent::HelpComponent() {
     textEditor.setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
     textEditor.setFont(juce::FontOptions ("Courier", 14.0f, juce::Font::plain));
     juce::String manual = 
-        "=== COSMIC RAYS OPERATING MANUAL (BETA 3-13-2026) ===\n\n"
+        "=== COSMIC RAYS OPERATING MANUAL (" + version + ") ===\n\n"
         "1. CORE CONTROLS\n"
         "- ACTIVITY: Algorithm-specific density/complexity.\n"
         "- TIME: Grain length / repetition rate.\n"
@@ -228,7 +228,7 @@ void CosmicRaysAudioProcessorEditor::createPlasticTexture()
 }
 
 CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p), filterVis(p), pitchVis(p), densityMeter(p), waveformVis(p)
+    : AudioProcessorEditor (&p), currentVersion(PROJECT_VERSION_STRING), audioProcessor (p), filterVis(p), pitchVis(p), densityMeter(p), waveformVis(p), helpOverlay(currentVersion)
 {
     addAndMakeVisible(audioProcessor.visualiser);
     audioProcessor.visualiser.setColours(CustomLookAndFeel::Colors::scopeBg, CustomLookAndFeel::Colors::phosphorGreen.withAlpha(0.7f));
@@ -860,7 +860,7 @@ void CosmicRaysAudioProcessorEditor::paint (juce::Graphics& g) {
     }
     
     g.setFont (juce::FontOptions ("Courier", 12.0f, juce::Font::plain));
-    g.drawFittedText ("BETA 3-13-2026", headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
+    g.drawFittedText (currentVersion, headerArea.withTrimmedRight(20).withTrimmedBottom(25).toNearestInt(), juce::Justification::centredRight, 1);
     g.setColour(juce::Colour(0xFF222222)); g.setFont(juce::FontOptions ("Courier", 10.0f, juce::Font::bold));
     g.drawText("SYNC", shiftButton.getX(), shiftButton.getY() - 10, 50, 10, juce::Justification::centred);
     g.drawText("BEAT", tapButton.getX(), tapButton.getY() - 10, 50, 10, juce::Justification::centred);

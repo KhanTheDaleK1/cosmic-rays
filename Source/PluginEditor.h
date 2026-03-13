@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Version.h"
 #include "PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -64,14 +65,18 @@ private:
 
 class HelpComponent : public juce::Component {
 public:
-    HelpComponent();
+    HelpComponent(const juce::String& version);
     void paint(juce::Graphics& g) override;
     void resized() override;
 private:
     juce::TextEditor textEditor;
 };
 
-class CosmicRaysAudioProcessorEditor  : public juce::AudioProcessorEditor, public juce::Timer
+
+// ... other includes if they were there ...
+
+class CosmicRaysAudioProcessorEditor  : public juce::AudioProcessorEditor,
+ public juce::Timer
 {
 public:
     CosmicRaysAudioProcessorEditor (CosmicRaysAudioProcessor&);
@@ -85,6 +90,7 @@ public:
     void modifierKeysChanged (const juce::ModifierKeys& modifiers) override;
 
 private:
+    juce::String currentVersion = PROJECT_VERSION_STRING;
     CustomLookAndFeel customLookAndFeel;
     CosmicRaysAudioProcessor& audioProcessor;
 
@@ -111,8 +117,6 @@ private:
     juce::Label jitterLabel, revProbLabel;
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
     juce::Label cpuLabel, ramLabel;
-
-    juce::String currentVersion = "Beta 3-13-2026";
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;

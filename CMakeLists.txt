@@ -14,6 +14,18 @@ CPMAddPackage(
     GIT_TAG 8.0.6
 )
 
+# --- Version Generation ---
+find_package(Python3 REQUIRED)
+set(VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Version.h")
+
+# Use a custom target directly to ensure it runs every time
+add_custom_target(GenerateVersion
+    COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/generate_version.py" "${VERSION_HEADER}"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "Updating version header: ${VERSION_HEADER}"
+    VERBATIM
+)
+
 # --- Plugin Configuration ---
 juce_add_plugin(CosmicRays
     COMPANY_NAME "Beechem"
@@ -45,7 +57,10 @@ target_sources(CosmicRays
     Source/PluginEditor.h
     Source/GranularEngine.cpp
     Source/GranularEngine.h
+    "${VERSION_HEADER}"
 )
+
+add_dependencies(CosmicRays GenerateVersion)
 
 # --- 2026 Specific Flags ---
 target_compile_definitions(CosmicRays
