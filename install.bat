@@ -1,8 +1,8 @@
 @echo off
 setlocal
 
-echo Cosmic Rays - 1-Click Installer for Windows
-echo ------------------------------------------
+echo Cosmic Rays - 1-Click Installer for Windows (Beta 3-13-2026)
+echo -----------------------------------------------------------
 
 :: Check for CMake
 where cmake >nul 2>nul

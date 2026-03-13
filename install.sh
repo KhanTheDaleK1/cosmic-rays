@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Cosmic Rays - 1-Click Installer for macOS and Linux
+# Cosmic Rays - 1-Click Installer for macOS and Linux (Beta 3-13-2026)
 # Installs dependencies, builds the project, and copies the plugin files.
 
 set -e
 
-# Detect OS
+echo "=== Cosmic Rays Installer (Beta 3-13-2026) ==="
 OS="$(uname)"
 case "$OS" in
     Linux)
