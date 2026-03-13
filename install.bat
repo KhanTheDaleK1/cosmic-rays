@@ -1,7 +1,13 @@
 @echo off
 setlocal
 
-echo Cosmic Rays - 1-Click Installer for Windows (Beta 3-13-2026)
+:: Run version generation script to ensure it's up to date
+python generate_version.py
+
+:: Read version from version.txt
+set /p VERSION=<version.txt
+
+echo Cosmic Rays - 1-Click Installer for Windows (%VERSION%)
 echo -----------------------------------------------------------
 
 :: Check for CMake

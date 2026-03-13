@@ -44,10 +44,21 @@ def write_to_header(version_str, filepath="Source/Version.h"):
         f.write(header_content)
     print(f"Successfully wrote version {version_str} to {filepath}")
 
+def update_version_txt(version_str, filepath="version.txt"):
+    """
+    Updates the version.txt file with the new version string.
+    """
+    with open(filepath, "w") as f:
+        f.write(version_str)
+    print(f"Successfully updated {filepath} to {version_str}")
+
 if __name__ == "__main__":
     current_version = generate_version_string()
     print(f"Generated Version: {current_version}")
     
-    # Get filepath from command line if provided
+    # Update Version.h
     target_path = sys.argv[1] if len(sys.argv) > 1 else "Source/Version.h"
     write_to_header(current_version, target_path)
+    
+    # Update version.txt
+    update_version_txt(current_version)
