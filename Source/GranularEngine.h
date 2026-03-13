@@ -53,6 +53,7 @@ public:
     const juce::AudioBuffer<float>& getDelayBuffer() const { return delayBuffer; }
     int getWriteIdx() const { return writeIdx; }
     float getEnvFollower() const { return envFollower; }
+    float getOutputFollower() const { return outputFollower; }
 
 private:
     /**
@@ -106,6 +107,7 @@ private:
     
     // --- Internal Modulation ---
     float envFollower = 0.0f;
+    float outputFollower = 0.0f;
     bool transientDetected = false;
     float noiseMod = 0.0f, noiseTarget = 0.0f;
     float currentActiveGrainCount = 0.0f;

@@ -4,6 +4,8 @@
 #include "PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#define ENABLE_ENHANCED_VISUALIZERS 1
+
 class CustomLookAndFeel : public juce::LookAndFeel_V4 {
 public:
     CustomLookAndFeel();
@@ -117,6 +119,7 @@ private:
     juce::Label jitterLabel, revProbLabel;
     juce::Label resLabel, modRateLabelHeader, modDepthLabelHeader;
     juce::Label cpuLabel, ramLabel;
+    juce::Label waveformVisLabel, pitchVisLabel, filterVisLabel;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> activityAttach, repeatsAttach, filterAttach, spaceAttach, mixAttach, loopLevelAttach, gainAttach;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> modRateAttach, modDepthAttach, sprayAttach, spreadAttach;

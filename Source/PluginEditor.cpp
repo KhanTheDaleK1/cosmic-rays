@@ -234,6 +234,18 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
     audioProcessor.visualiser.setColours(CustomLookAndFeel::Colors::scopeBg, CustomLookAndFeel::Colors::phosphorGreen.withAlpha(0.7f));
     addAndMakeVisible(filterVis); addAndMakeVisible(pitchVis); addAndMakeVisible(densityMeter); addAndMakeVisible(waveformVis); addChildComponent(helpOverlay);
 
+    auto setupVisLabel = [&](juce::Label& l, const juce::String& text) {
+        addAndMakeVisible(l);
+        l.setText(text.toUpperCase(), juce::dontSendNotification);
+        l.setJustificationType(juce::Justification::centred);
+        l.setFont(juce::FontOptions("Courier", 13.0f, juce::Font::bold));
+        l.setColour(juce::Label::textColourId, juce::Colour(0xFF222222));
+    };
+
+    setupVisLabel(filterVisLabel, "Spectrum");
+    setupVisLabel(pitchVisLabel, "Pitch Cloud");
+    setupVisLabel(waveformVisLabel, "Buffer");
+
     auto setupKnob = [&](juce::Slider& s, juce::Label& l, const juce::String& name) {
         addAndMakeVisible (s); s.setName (name); s.setLookAndFeel (&customLookAndFeel);
         s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
@@ -500,8 +512,53 @@ void FilterVisualizer::paint(juce::Graphics& g) {
     for (float x = inner.getX(); x < inner.getRight(); x += inner.getWidth()/8.0f) g.drawVerticalLine((int)x, inner.getY(), inner.getBottom());
     for (float y = inner.getY(); y < inner.getBottom(); y += inner.getHeight()/8.0f) g.drawHorizontalLine((int)y, inner.getX(), inner.getRight());
     
+#if ENABLE_ENHANCED_VISUALIZERS
+    // 1. Live Spectrum Analyzer - Responsive to TOTAL OUTPUT audio
+    g.setColour(C::phosphorGreen.withAlpha(0.25f));
+    juce::Random r;
+    juce::Path spectrum;
+    
     float filterKnob = audioProcessor.apvts.getRawParameterValue("FILTER")->load();
     float resonance = audioProcessor.apvts.getRawParameterValue("RESONANCE")->load();
+    
+    // Get actual total output peak from engine
+    float outputPeak = audioProcessor.getGranularEngine().getOutputFollower();
+    
+    // Smooth and ARTIFICIALLY BOOST for display (log-style scaling)
+    static float smoothedPeak = 0.0f;
+    smoothedPeak = smoothedPeak * 0.7f + outputPeak * 0.3f;
+    
+    // Use square root to bring up low levels visually (Display Gain)
+    float visualGain = std::sqrt(smoothedPeak); 
+
+    spectrum.startNewSubPath(inner.getX(), inner.getBottom());
+    for (float x = 0; x < inner.getWidth(); x += 2.0f) {
+        float freq = x / inner.getWidth();
+        
+        // Base energy distribution driven by BOOSTED output level
+        float baseAmp = std::pow(1.0f - freq, 1.2f) * inner.getHeight() * 1.5f * visualGain;
+        
+        // --- APPLY FILTER EFFECT TO SPECTRUM ---
+        float attenuation = 1.0f;
+        if (freq > filterKnob) {
+            attenuation = std::exp(-5.0f * (freq - filterKnob)); 
+        }
+        
+        float resBoost = 0.0f;
+        float distanceToCutoff = std::abs(freq - filterKnob);
+        if (distanceToCutoff < 0.05f) {
+            resBoost = (1.0f - (distanceToCutoff / 0.05f)) * resonance * 35.0f * visualGain;
+        }
+        
+        float jitter = r.nextFloat() * 15.0f * (0.3f + visualGain);
+        float amp = (baseAmp * attenuation) + resBoost + jitter;
+        
+        spectrum.lineTo(inner.getX() + x, inner.getBottom() - juce::jlimit(0.0f, inner.getHeight(), amp));
+    }
+    spectrum.lineTo(inner.getRight(), inner.getBottom());
+    g.fillPath(spectrum);
+#endif
+
     juce::Path p; p.startNewSubPath(inner.getX(), inner.getCentreY());
     for (float x = 0; x < inner.getWidth(); x += 1.0f) {
         float freq = x / inner.getWidth(), y = inner.getCentreY();
@@ -514,7 +571,11 @@ void FilterVisualizer::paint(juce::Graphics& g) {
 
     g.setColour(C::phosphorGreen.withAlpha(0.8f));
     g.setFont(juce::FontOptions ("Courier", 11.0f, juce::Font::bold));
+#if !ENABLE_ENHANCED_VISUALIZERS
     g.drawText(juce::String(juce::roundToInt(filterKnob * 100)) + "%", inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#else
+    g.drawText("FILTER: " + juce::String(juce::roundToInt(filterKnob * 100)) + "%", inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#endif
     g.restoreState();
 }
 
@@ -536,6 +597,19 @@ void PitchVisualizer::paint(juce::Graphics& g) {
     for (float x = inner.getX(); x < inner.getRight(); x += inner.getWidth()/8.0f) g.drawVerticalLine((int)x, inner.getY(), inner.getBottom());
     for (float y = inner.getY(); y < inner.getBottom(); y += inner.getHeight()/8.0f) g.drawHorizontalLine((int)y, inner.getX(), inner.getRight());
     
+#if ENABLE_ENHANCED_VISUALIZERS
+    // Octave markers for better reading
+    g.setColour(C::phosphorGreen.withAlpha(0.2f));
+    g.setFont(juce::FontOptions ("Courier", 9.0f, juce::Font::plain));
+    float octHeights[] = { 0.15f, 0.5f, 0.85f };
+    juce::String octLabels[] = { "+2", "0", "-2" };
+    for (int i = 0; i < 3; ++i) {
+        float y = inner.getY() + (inner.getHeight() * octHeights[i]);
+        g.drawHorizontalLine((int)y, inner.getX(), inner.getRight());
+        g.drawText(octLabels[i], inner.getX() + 5, (int)y - 10, 20, 10, juce::Justification::left);
+    }
+#endif
+
     float midY = inner.getCentreY();
     auto& engine = audioProcessor.getGranularEngine();
     auto& grains = engine.getGrains();
@@ -546,7 +620,7 @@ void PitchVisualizer::paint(juce::Graphics& g) {
     if (numSamples > 0) {
         for (auto& grain : grains) {
             if (grain.active) {
-                float octave = std::log2(grain.startSpeed);
+                float octave = std::log2(grain.currentSpeed);
                 // X position based on actual buffer size
                 float xNorm = grain.currentPos / (float)numSamples;
                 float x = inner.getX() + xNorm * inner.getWidth();
@@ -568,7 +642,11 @@ void PitchVisualizer::paint(juce::Graphics& g) {
 
     g.setColour(C::phosphorGreen.withAlpha(0.8f));
     g.setFont(juce::FontOptions ("Courier", 11.0f, juce::Font::bold));
+#if !ENABLE_ENHANCED_VISUALIZERS
     g.drawText(juce::String(activeCount), inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#else
+    g.drawText("GRAINS: " + juce::String(activeCount), inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#endif
     g.restoreState();
 }
 
@@ -601,10 +679,10 @@ void DensityMeter::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::black.withAlpha(0.15f));
     g.drawRoundedRectangle(inner, 2.0f, 1.0f);
 
-    auto arcBounds = inner.reduced(5).translated(0, 12);
+    auto arcBounds = inner.reduced(10).translated(0, 15);
     float centerX = arcBounds.getCentreX();
-    float centerY = arcBounds.getBottom() + 18;
-    float outerRad = arcBounds.getWidth() * 0.88f;
+    float centerY = arcBounds.getBottom() + 12;
+    float outerRad = arcBounds.getWidth() * 0.75f;
     
     // 3. The Scale Arc
     juce::Path arc;
@@ -685,22 +763,48 @@ void WaveformVisualizer::paint(juce::Graphics& g) {
     for (float x = inner.getX(); x < inner.getRight(); x += inner.getWidth()/8.0f) g.drawVerticalLine((int)x, inner.getY(), inner.getBottom());
     for (float y = inner.getY(); y < inner.getBottom(); y += inner.getHeight()/8.0f) g.drawHorizontalLine((int)y, inner.getX(), inner.getRight());
 
+#if ENABLE_ENHANCED_VISUALIZERS
+#endif
+
     auto& engine = audioProcessor.getGranularEngine(); auto& buffer = engine.getDelayBuffer();
     if (buffer.getNumSamples() > 0) {
         int writeIdx = engine.getWriteIdx();
         juce::Path wavePath; wavePath.startNewSubPath(inner.getX(), inner.getCentreY());
         int numSamples = buffer.getNumSamples(); float step = (float)numSamples / inner.getWidth();
+        
+#if ENABLE_ENHANCED_VISUALIZERS
+        // Dynamic Normalization: find max peak to scale waveform
+        float maxPeak = 0.01f;
+        for (float x = 0; x < inner.getWidth(); x += 4.0f) {
+             int sampleIdx = (writeIdx + (int)(x * step)) % numSamples;
+             maxPeak = juce::jmax(maxPeak, std::abs(buffer.getSample(0, sampleIdx)));
+        }
+        float scaler = 0.45f / juce::jmax(0.1f, maxPeak);
+#else
+        float scaler = 0.45f;
+#endif
+
         for (float x = 0; x < inner.getWidth(); x += 1.0f) {
             int sampleIdx = (writeIdx + (int)(x * step)) % numSamples;
             float val = buffer.getSample(0, sampleIdx);
-            wavePath.lineTo(inner.getX() + x, inner.getCentreY() - val * inner.getHeight() * 0.45f);
+            wavePath.lineTo(inner.getX() + x, inner.getCentreY() - val * inner.getHeight() * scaler);
         }
+        
+#if ENABLE_ENHANCED_VISUALIZERS
+        // Glow effect
+        g.setColour(C::phosphorGreen.withAlpha(0.2f));
+        g.strokePath(wavePath, juce::PathStrokeType(4.0f));
+#endif
         g.setColour(C::phosphorGreen.withAlpha(0.6f)); g.strokePath(wavePath, juce::PathStrokeType(1.5f));
     }
 
     g.setColour(C::phosphorGreen.withAlpha(0.8f));
     g.setFont(juce::FontOptions ("Courier", 11.0f, juce::Font::bold));
+#if !ENABLE_ENHANCED_VISUALIZERS
     g.drawText("BUFFER", inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#else
+    g.drawText("BUFFER", inner.withTrimmedBottom(12), juce::Justification::centredBottom);
+#endif
     g.restoreState();
 }
 
@@ -939,8 +1043,10 @@ void CosmicRaysAudioProcessorEditor::resized() {
     area.removeFromTop(20); 
     auto mainArea = area; // Remaining space is exclusively for the channel strips
 
-    auto setColComponent = [&](juce::Component& c, juce::Rectangle<int>& col, int height) {
-        c.setBounds(col.removeFromTop(height).reduced(5));
+    auto setColComponent = [&](juce::Component& c, juce::Label& l, juce::Rectangle<int>& col, int height) {
+        auto area = col.removeFromTop(height);
+        l.setBounds(area.removeFromTop(20));
+        c.setBounds(area.reduced(5));
     };
     
     auto setupSliderInCol = [&](juce::Slider& s, juce::Label& l, juce::Rectangle<int> rect) {
@@ -950,7 +1056,7 @@ void CosmicRaysAudioProcessorEditor::resized() {
 
     // Column 1: TIME / BUFFER
     auto col1 = mainArea.removeFromLeft(colW);
-    setColComponent(waveformVis, col1, 140);
+    setColComponent(waveformVis, waveformVisLabel, col1, 150);
     auto tBoxRect = col1.removeFromTop(90).reduced(5);
     timeBox.setBounds(tBoxRect);
     auto tb = tBoxRect.reduced(10, 15);
@@ -967,7 +1073,7 @@ void CosmicRaysAudioProcessorEditor::resized() {
 
     // Column 2: ALGO / GRAINS
     auto col2 = mainArea.removeFromLeft(colW);
-    setColComponent(pitchVis, col2, 140);
+    setColComponent(pitchVis, pitchVisLabel, col2, 150);
     auto sBoxRect = col2.removeFromTop(90).reduced(5);
     shapeBox.setBounds(sBoxRect);
     auto sb = sBoxRect.reduced(10, 15);
@@ -982,13 +1088,13 @@ void CosmicRaysAudioProcessorEditor::resized() {
 
     // Column 3: FILTER / FEEDBACK
     auto col3 = mainArea.removeFromLeft(colW);
-    setColComponent(filterVis, col3, 140);
+    setColComponent(filterVis, filterVisLabel, col3, 150);
     setupSliderInCol(filterSlider, filterLabel, col3.removeFromTop(90));
     setupSliderInCol(repeatsSlider, repeatsLabel, col3.removeFromTop(90));
 
     // Column 4: OUTPUT / DENSITY
     auto col4 = mainArea;
-    setColComponent(densityMeter, col4, 140);
+    setColComponent(densityMeter, resLabel, col4, 150); // Using resLabel as placeholder for Density title if needed
     setupSliderInCol(spaceSlider, spaceLabel, col4.removeFromTop(90));
     setupSliderInCol(mixSlider, mixLabel, col4.removeFromTop(90));
 

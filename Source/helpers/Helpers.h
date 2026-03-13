@@ -17,6 +17,7 @@ struct Grain {
     float length = 0.0f;        // Total duration in samples
     float startSpeed = 1.0f;    // Base playback rate (unity = 1.0)
     float endSpeed = 1.0f;      // Target playback rate (or depth overloading)
+    float currentSpeed = 1.0f;  // Instantaneous playback rate for visualizers
     float internalPhase = 0.0f; // Phase offset for internal 'wah' oscillations
     float pan = 0.5f;           // Stereo position (0.0 = Left, 1.0 = Right)
     float age = 0.0f;           // Current age in samples

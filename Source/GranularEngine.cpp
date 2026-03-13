@@ -21,7 +21,7 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     maxHoldSamples = static_cast<int>(sampleRate * 1.0);  
     delayBuffer.setSize(numChannels, maxDelaySamples);
     holdBuffer.setSize(numChannels, maxHoldSamples);
-    loopBuffer.setSize(numChannels, (int)(sampleRate * 60.0)); 
+    loopBuffer.setSize(numChannels, (int)(sampleRate * 30.0)); 
     
     delayBuffer.clear(); holdBuffer.clear(); loopBuffer.clear(); 
     holdWriteIdx = 0; mdlPhase = 0.0f; mdlPhase2 = 0.0f; mdlPhase3 = 0.0f;
@@ -354,6 +354,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         // Exponential Jitter (semitones)
         if (jitter > 0.05f) {
             float jOff = (dist(rng) * 2.0f - 1.0f) * jitter * 12.0f; // Scale up to 1 octave
+            if (globalQuant) jOff = std::round(jOff); // Snap to semitones if Quantize is on
             g.startSpeed *= std::pow(2.0f, jOff / 12.0f);
         }
 
@@ -361,6 +362,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
         float driftVal = smoothDrift.getNextValue();
         if (driftVal > 0.01f) {
             float driftSemi = (dist(rng) * 2.0f - 1.0f) * driftVal * 2.0f;
+            if (globalQuant) driftSemi = std::round(driftSemi); // Snap to semitones if Quantize is on
             g.startSpeed *= std::pow(2.0f, driftSemi / 12.0f);
         }
 
@@ -418,9 +420,17 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         (int)pLooperWindowType->load()
     };
 
+    float mixVal = smoothMix.getTargetValue(), gainVal = smoothGain.getTargetValue();
+    float masterWet = smoothMasterWetVol.getTargetValue();
+    float repeatsVal = smoothRepeats.getTargetValue();
+    float activityVal = smoothActivity.getTargetValue();
+    float shapeVal = smoothShape.getTargetValue();
+    float timeVal = smoothTime.getTargetValue();
+    float effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
+    
+    int activeGrainsThisBlock = 0;
+
     for (int i = 0; i < numSamples; ++i) {
-        float timeVal = smoothTime.getNextValue(), effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
-        float activityVal = smoothActivity.getNextValue();
         float modRateVal = smoothModRate.getNextValue();
         float modDepthVal = smoothModDepth.getNextValue();
         
@@ -434,7 +444,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         float depthSamples = (modDepthVal * 50.0f / 1000.0f) * fs;
         float currentMdlDelay = std::abs((depthSamples + 10.0f) + (compoundLfo * depthSamples));
  
-        scheduleGrains(activityVal, effectiveTimeMs, smoothShape.getNextValue(), algo, writeIdx, gp);
+        scheduleGrains(activityVal, effectiveTimeMs, shapeVal, algo, writeIdx, gp);
         
         if (algo == 7) { 
             if (interruptTimer > 0) { interruptGate = juce::jmax(0.0f, interruptGate - 0.01f); interruptTimer--; } 
@@ -442,10 +452,8 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         } else { interruptGate = 1.0f; interruptTimer = 0; }
 
         int activeGrainsThisSample = 0;
-        float winSumL = 0.0f;
-        float winSumR = 0.0f;
-        float currentSampleL = 0.0f;
-        float currentSampleR = 0.0f;
+        float winSumL = 0.0f, winSumR = 0.0f;
+        float currentSampleL = 0.0f, currentSampleR = 0.0f;
 
         for (int activePos = 0; activePos < (int)activeGrainIndices.size();)
         {
@@ -454,16 +462,12 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             float phase = g.age / g.length;
             float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase));
             
-            float gainL = window * (1.0f - g.pan);
-            float gainR = window * g.pan;
-            
-            winSumL += gainL;
-            winSumR += gainR;
+            float gainL = window * (1.0f - g.pan), gainR = window * g.pan;
+            winSumL += gainL; winSumR += gainR;
 
             float sL = bufferReaders.getNextSampleLinear(0, g.currentPos, delayBuffer, maxDelaySamples) * gainL;
             float sR = bufferReaders.getNextSampleLinear(numChannels > 1 ? 1 : 0, g.currentPos, delayBuffer, maxDelaySamples) * gainR;
 
-            // Apply Per-Grain Filtering (Simple 1-pole Lowpass)
             auto& states = grainFilters[(size_t)grainIndex];
             float lpAlpha = g.filterCutoff;
             states[0].y1 = states[0].y1 + lpAlpha * (sL - states[0].y1);
@@ -476,19 +480,19 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             currentSampleL += sL;
             if (numChannels > 1) currentSampleR += sR;
 
-            ++activeGrainsThisSample;
+            activeGrainsThisSample++;
             if (algo == 2) {
-                // Exponential glide: speed = startSpeed * (ratio ^ progress)
-                float progress = g.age / g.length;
-                float instSpeed = g.startSpeed * std::pow(g.endSpeed, progress);
+                float instSpeed = g.startSpeed * std::pow(g.endSpeed, phase);
+                g.currentSpeed = instSpeed;
                 g.currentPos += g.reverse ? -instSpeed : instSpeed;
-            }
-            else {
+            } else {
+                g.currentSpeed = g.startSpeed;
                 g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
             }
 
             if (g.currentPos < 0.0f) g.currentPos += (float)maxDelaySamples;
             else if (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
+            
             if (++g.age >= g.length) {
                 helpers.releaseActiveGrainByActiveListPosition(activeGrainIndices, freeGrainIndices, grains, activePos);
                 continue;
@@ -496,24 +500,18 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             ++activePos;
         }
         
-        // Smoothed Peak Tracking for the Density Meter
-        float instantCount = (float)activeGrainsThisSample;
-        float alpha = instantCount > currentActiveGrainCount ? 0.1f : 0.005f; 
-        currentActiveGrainCount = alpha * instantCount + (1.0f - alpha) * currentActiveGrainCount;
+        activeGrainsThisBlock = std::max(activeGrainsThisBlock, activeGrainsThisSample);
 
-        float mix = smoothMix.getNextValue(), gain = smoothGain.getNextValue();
-        float masterWet = smoothMasterWetVol.getNextValue();
-        float repeats = smoothRepeats.getNextValue();
+        float densityFactor = std::sqrt(juce::jmax(1.0f, currentActiveGrainCount));
+        float normL = winSumL > 0.001f ? (1.0f / (winSumL * 0.5f + densityFactor * 0.5f)) : 1.0f;
+        float normR = winSumR > 0.001f ? (1.0f / (winSumR * 0.5f + densityFactor * 0.5f)) : 1.0f;
+
+        float densityProtection = 1.0f / (1.0f + (currentActiveGrainCount * 0.001f));
+        normL *= densityProtection; normR *= densityProtection;
+
         int activeChannels = std::min(numChannels, preparedChannels);
-
-        // Linear Normalization for Unity Gain (mathematically matches input level)
-        float normL = winSumL > 0.001f ? 1.0f / winSumL : 1.0f;
-        float normR = winSumR > 0.001f ? 1.0f / winSumR : 1.0f;
-
         for (int ch = 0; ch < activeChannels; ++ch) {
             float dryInput = buffer.getSample(ch, i);
-            
-            // Apply normalization and a safety saturation stage
             float normalizedWet = (ch == 0 ? currentSampleL * normL : currentSampleR * normR);
             float wetRaw = std::tanh(normalizedWet); 
             
@@ -523,38 +521,34 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             float wet = mdlDelay.popSample(ch);
             if (!std::isfinite(wet)) wet = 0.0f;
             
-            // Final output mix
-            buffer.setSample(ch, i, (dryInput * (1.0f - mix) + (wet * masterWet) * mix) * gain);
+            buffer.setSample(ch, i, (dryInput * (1.0f - mixVal) + (wet * masterWet) * mixVal) * gainVal);
             
             if (!freeze) {
-                // Feedback remains stable and within [-1, 1] range
-                float fb = wet * repeats * 0.98f; 
+                float fb = wet * repeatsVal * 0.98f; 
                 if (!std::isfinite(fb)) fb = 0.0f;
                 delayBuffer.setSample(ch, writeIdx, std::tanh(dryInput + fb));
             }
         }
-        //mdlWriteIdx = (mdlWriteIdx + 1) % 16384;
-        if (!freeze)
-        {
+        
+        if (!freeze) {
             writeIdx = (writeIdx + 1) % maxDelaySamples;
             recordedSamples = std::min(recordedSamples + 1, maxDelaySamples);
         }
     }
+
+    float alphaCount = activeGrainsThisBlock > currentActiveGrainCount ? 0.1f : 0.005f; 
+    currentActiveGrainCount = alphaCount * (float)activeGrainsThisBlock + (1.0f - alphaCount) * currentActiveGrainCount;
     
     juce::dsp::AudioBlock<float> outputBlock(buffer); 
-    
-    // Update Filter and FX parameters before processing
     float filterVal = smoothFilter.getNextValue();
     float resVal = apvts.getRawParameterValue("RESONANCE")->load();
     float spaceVal = smoothSpace.getNextValue();
     
-    // Logarithmic mapping for musical filter cutoff (20Hz - 20kHz)
     float cutoffFreq = 20.0f * std::pow(1000.0f, filterVal);
     auto& filter = fxChain.get<0>();
     filter.setCutoffFrequencyHz(cutoffFreq);
-    filter.setResonance(resVal * 0.9f); // Keep resonance safe
+    filter.setResonance(resVal * 0.9f);
     
-    // Update Reverb (Space)
     auto& reverb = fxChain.get<1>();
     juce::dsp::Reverb::Parameters reverbParams;
     reverbParams.roomSize = spaceVal * 0.95f;
@@ -564,8 +558,12 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     reverbParams.width = 1.0f;
     reverb.setParameters(reverbParams);
     
-    // Process the FX chain
     fxChain.process(juce::dsp::ProcessContextReplacing<float>(outputBlock));
-    
     limiter.process(juce::dsp::ProcessContextReplacing<float>(outputBlock));
+
+    float peak = 0.0f;
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        peak = std::max(peak, buffer.getMagnitude(ch, 0, buffer.getNumSamples()));
+    float alphaOut = peak > outputFollower ? 0.05f : 0.005f; 
+    outputFollower = alphaOut * peak + (1.0f - alphaOut) * outputFollower;
 }
