@@ -4,7 +4,7 @@
 
 Cosmic Rays is a professional-grade granular processor for macOS, Linux, and Windows, inspired by boutique hardware granular synthesis. It utilizes advanced kinematic motion models and a dedicated global modulation engine to create lush, nostalgic, and evolving sonic textures.
 
-<img width="659" height="498" alt="image" src="https://github.com/user-attachments/assets/0dc4b473-f27d-4616-826f-a0d99a9b94ce" />
+<img width="659" height="498" alt="Screenshot 2026-03-16 141452" src="https://github.com/user-attachments/assets/e0a3e3ea-77ff-4fbf-99bf-ddbc8a8994b7" />
 
 ## 2026 Project Standards
 This project follows modern C++20 and JUCE 8.0.6 best practices:
