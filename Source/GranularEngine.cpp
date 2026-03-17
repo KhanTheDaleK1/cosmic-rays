@@ -34,8 +34,8 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
 
     juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
 
-    // Maximum delay = maximum modDepth (50ms) + margin
-    const int maxMdlDelaySamples = (int)(sampleRate * 0.1); // 100ms margin
+    // Máximo delay = modDepth máximo (50ms) + margen / Maximum delay = maximum modDepth (50ms) + margin
+    const int maxMdlDelaySamples = (int)(sampleRate * 0.1); // 100ms de margen / 100ms margin
     mdlDelayL.prepare(spec);
     mdlDelayL.setMaximumDelayInSamples(maxMdlDelaySamples);
     mdlDelayR.prepare(spec);
