@@ -39,7 +39,7 @@ juce_add_plugin(CosmicRays
     PLUGIN_CODE "COSR"
     FORMATS AU VST3 LV2
     PRODUCT_NAME "Cosmic Rays"
-    LV2URI "https://beechen.site/plugins/cosmic-rays"
+    LV2URI "https://beechem.site/plugins/cosmic-rays"
 )
 
 # --- Binary Data ---
