@@ -6,8 +6,8 @@
 set -e
 
 # Read the current version
-if [ -f ../version.txt ]; then
-    VERSION=$(cat ../version.txt)
+if [ -f version.txt ]; then
+    VERSION=$(cat version.txt)
 else
     VERSION="Unknown"
 fi
@@ -25,7 +25,7 @@ if [ "$OS" == "Darwin" ]; then
     LV2_PATH="$HOME/Library/Audio/Plug-Ins/LV2"
     
     # 1. Try pre-built binaries
-    if [ -d "macOS/Cosmic Rays.component" ] || [ -d "macOS/Cosmic Rays.vst3" ] || [ -d "macOS/Cosmic Rays.lv2" ]; then
+    if [ -d "macOS/Cosmic Rays.component" ] || [ -d "macOS/Cosmic Rays.vst3" ]; then
         echo "Found pre-built binaries. Installing..."
         mkdir -p "$AU_PATH" "$VST3_PATH" "$LV2_PATH"
         [ -d "macOS/Cosmic Rays.component" ] && cp -R "macOS/Cosmic Rays.component" "$AU_PATH/"
@@ -56,7 +56,12 @@ if [ "$BINARY_FOUND" = true ]; then
 fi
 
 # --- Source Build Fallback ---
-echo "Pre-built binaries not found for your platform. Attempting to build from source..."
+echo "Pre-built binaries not found for your platform."
+read -p "Attempt to build from source? (y/n): " confirm
+if [[ $confirm != [yY] ]]; then
+    echo "Installation cancelled."
+    exit 1
+fi
 
 case "$OS" in
     Linux)
@@ -79,7 +84,7 @@ esac
 
 # Build the project
 echo "Building Cosmic Rays..."
-cd ..
+cd ../..
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
@@ -89,18 +94,18 @@ if [ "$OS" == "Linux" ]; then
     VST3_PATH="$HOME/.vst3"
     LV2_PATH="$HOME/.lv2"
     mkdir -p "$VST3_PATH" "$LV2_PATH"
-    cp -r CosmicRays_artefacts/Release/VST3/Cosmic\ Rays.vst3 "$VST3_PATH/"
-    cp -r CosmicRays_artefacts/Release/LV2/Cosmic\ Rays.lv2 "$LV2_PATH/"
+    cp -r Source/CosmicRays_artefacts/Release/VST3/Cosmic\ Rays.vst3 "$VST3_PATH/"
+    cp -r Source/CosmicRays_artefacts/Release/LV2/Cosmic\ Rays.lv2 "$LV2_PATH/"
 elif [ "$OS" == "Darwin" ]; then
     AU_PATH="$HOME/Library/Audio/Plug-Ins/Components"
     VST3_PATH="$HOME/Library/Audio/Plug-Ins/VST3"
     LV2_PATH="$HOME/Library/Audio/Plug-Ins/LV2"
     mkdir -p "$AU_PATH" "$VST3_PATH" "$LV2_PATH"
-    cp -r CosmicRays_artefacts/Release/AU/Cosmic\ Rays.component "$AU_PATH/"
-    cp -r CosmicRays_artefacts/Release/VST3/Cosmic\ Rays.vst3 "$VST3_PATH/"
-    # If LV2 is built
-    [ -d "CosmicRays_artefacts/Release/LV2/Cosmic Rays.lv2" ] && cp -r CosmicRays_artefacts/Release/LV2/Cosmic\ Rays.lv2 "$LV2_PATH/"
+    cp -r Source/CosmicRays_artefacts/Release/AU/Cosmic\ Rays.component "$AU_PATH/"
+    cp -r Source/CosmicRays_artefacts/Release/VST3/Cosmic\ Rays.vst3 "$VST3_PATH/"
+    [ -d "Source/CosmicRays_artefacts/Release/LV2/Cosmic Rays.lv2" ] && cp -r Source/CosmicRays_artefacts/Release/LV2/Cosmic\ Rays.lv2 "$LV2_PATH/"
 fi
 
 echo "Cosmic Rays build and installation complete!"
+
 

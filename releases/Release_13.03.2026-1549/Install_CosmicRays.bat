@@ -2,8 +2,8 @@
 setlocal
 
 :: Read version from version.txt if it exists
-if exist "..\version.txt" (
-    set /p VERSION=<"..\version.txt"
+if exist "version.txt" (
+    set /p VERSION=<"version.txt"
 ) else (
     set VERSION=Unknown
 )
@@ -42,26 +42,30 @@ if %BINARY_FOUND% equ 1 (
     exit /b 0
 )
 
-:: 2. Fallback to building from source
-echo Pre-built binaries not found. Attempting to build from source...
+:: 2. Fallback to building from source (only if binaries were not found)
+echo Pre-built binaries not found in the package.
+echo If you have CMake and a C++ compiler installed, you can attempt to build from source.
+
+set /p BUILD_FROM_SOURCE="Build from source? (y/n): "
+if /i "%BUILD_FROM_SOURCE%" neq "y" (
+    echo.
+    echo Installation cancelled. Please visit beechem.site/cosmic-rays to download the full package.
+    pause
+    exit /b 1
+)
 
 :: Check for CMake
 where cmake >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Error: Pre-built binaries not found and CMake is not installed.
+    echo Error: CMake not found.
     echo Please install CMake to build from source, or download the full release package.
     pause
     exit /b 1
 )
 
-:: Check for version generator
-if exist "..\generate_version.py" (
-    python "..\generate_version.py"
-)
-
-:: Build the project
+:: Build the project (Assuming we are in releases/Release_...)
 echo Building Cosmic Rays...
-cd ..
+cd ..\..
 if not exist build mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -86,4 +90,5 @@ echo.
 echo Cosmic Rays build and installation complete!
 echo You may need to restart your DAW to see the plugin.
 pause
+
 
