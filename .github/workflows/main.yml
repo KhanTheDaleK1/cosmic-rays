@@ -102,8 +102,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          # FIXED: Added the dot before the extension
-          path: build/CosmicRays-*.${{ matrix.package_extension }}
+          # Using a broader glob to ensure we catch the versioned filename
+          path: build/*.${{ matrix.package_extension }}
           if-no-files-found: error
           retention-days: 1
 
@@ -121,10 +121,10 @@ jobs:
       - name: Flatten Artifacts
         run: |
           mkdir release_assets
-          # Capture all versioned installers
-          find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
-          find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
-          find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
+          # Find all installers regardless of timestamp
+          find artifacts -name "*.pkg" -exec cp {} release_assets/ \;
+          find artifacts -name "*.exe" -exec cp {} release_assets/ \;
+          find artifacts -name "*.deb" -exec cp {} release_assets/ \;
           ls -R release_assets/
 
       - name: Create Release
@@ -154,7 +154,8 @@ jobs:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
         run: |
-          find artifacts -type f \( -name "CosmicRays-*.pkg" -o -name "CosmicRays-*.exe" -o -name "CosmicRays-*.deb" \) | while read file; do
+          # Loop through all downloaded installers and push to Gumroad
+          find artifacts -type f \( -name "*.pkg" -o -name "*.exe" -o -name "*.deb" \) | while read file; do
             filename=$(basename "$file")
             echo "Uploading $filename to Gumroad..."
             curl -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
