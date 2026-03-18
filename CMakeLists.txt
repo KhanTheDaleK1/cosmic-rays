@@ -64,6 +64,7 @@ target_compile_definitions(CosmicRays
     PUBLIC
     JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1
     JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_WEB_BROWSER=0 # Disable web browser to remove heavy Linux dependencies
     # Enable Stable Linux rendering
     $<$<PLATFORM_ID:Linux>:JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1>
 )
