@@ -138,15 +138,15 @@ else() # Linux
 endif()
 
 if(TARGET CosmicRays_VST3)
-    install(TARGETS CosmicRays_VST3 DESTINATION "${PLUGIN_DEST_VST3}")
+    install(TARGETS CosmicRays_VST3 DESTINATION "${PLUGIN_DEST_VST3}" COMPONENT VST3)
 endif()
 
 if(TARGET CosmicRays_AU)
-    install(TARGETS CosmicRays_AU DESTINATION "${PLUGIN_DEST_AU}")
+    install(TARGETS CosmicRays_AU DESTINATION "${PLUGIN_DEST_AU}" COMPONENT AU)
 endif()
 
 if(TARGET CosmicRays_LV2)
-    install(TARGETS CosmicRays_LV2 DESTINATION "${PLUGIN_DEST_LV2}")
+    install(TARGETS CosmicRays_LV2 DESTINATION "${PLUGIN_DEST_LV2}" COMPONENT LV2)
 endif()
 
 if(APPLE)
