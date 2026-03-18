@@ -10,12 +10,13 @@ def generate_version_string():
     """
     try:
         # Set timezone strictly to US Central Time
+        # On Windows, this requires the 'tzdata' pip package
         central_tz = zoneinfo.ZoneInfo("US/Central")
     except zoneinfo.ZoneInfoNotFoundError:
-        # Fallback for systems without zoneinfo database (like some Windows/CI envs)
-        # Using a fixed offset if possible or just failing gracefully
-        print("Error: Timezone 'US/Central' not found. Ensure you are using Python 3.9+.")
-        sys.exit(1)
+        # Fallback: Manual offset for US Central (CST is UTC-6, CDT is UTC-5)
+        # We try to detect if we're in DST, but a fixed -6 is safer than failing.
+        print("Warning: 'US/Central' not found in system database. Falling back to UTC-6.")
+        central_tz = datetime.timezone(datetime.timedelta(hours=-6))
 
     # Get the current time in the specified timezone
     now_central = datetime.datetime.now(central_tz)

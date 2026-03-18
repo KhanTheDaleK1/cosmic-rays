@@ -50,6 +50,10 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install Python Dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: pip install tzdata
+
       - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
