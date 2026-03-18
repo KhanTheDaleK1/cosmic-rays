@@ -82,6 +82,9 @@ target_compile_definitions(CosmicRays
     
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
+
+    # Ensure Linux visual consistency (Corrects "looks nothing like it" issue)
+    $<$<PLATFORM_ID:Linux>:JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1 JUCE_OPENGL=1>
 )
 
 # --- Libraries ---
@@ -126,9 +129,12 @@ set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 # Modern Platform-Specific Plugin Path Logic
 if(APPLE)
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "CosmicRays")
+    # Using User's Library to avoid macOS Sequoia System Volume security triggers
     set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
     set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
+    # Set the install prefix to the user's home directory for .pkg
+    set(CPACK_PACKAGING_INSTALL_PREFIX "$ENV{HOME}") 
 elseif(WIN32)
     set(PLUGIN_DEST_VST3 "Common Files/VST3")
     set(PLUGIN_DEST_LV2 "Common Files/LV2")
