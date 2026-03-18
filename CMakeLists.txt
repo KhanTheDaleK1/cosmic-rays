@@ -115,14 +115,17 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 # --- CPack Configuration ---
-install(TARGETS CosmicRays_VST3 DESTINATION "Library/Audio/Plug-Ins/VST3")
-install(TARGETS CosmicRays_AU DESTINATION "Library/Audio/Plug-Ins/Components")
-install(TARGETS CosmicRays_LV2 DESTINATION "Library/Audio/Plug-Ins/LV2")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/version.txt" VERSION_STR)
+string(STRIP "${VERSION_STR}" VERSION_STR)
 
 set(CPACK_PACKAGE_NAME "CosmicRays")
 set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cosmic Rays Audio Plugin")
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
+
+install(TARGETS CosmicRays_VST3 DESTINATION "Library/Audio/Plug-Ins/VST3")
+install(TARGETS CosmicRays_AU DESTINATION "Library/Audio/Plug-Ins/Components")
+install(TARGETS CosmicRays_LV2 DESTINATION "Library/Audio/Plug-Ins/LV2")
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
