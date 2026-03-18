@@ -65,26 +65,11 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     smoothMasterWetVol.setTargetValue(1.0f);
     smoothLoopFade.setTargetValue(1.0f);
 
-    grainFilters.assign(256, std::vector<FilterState>(numChannels));
+    grainFilters.assign(MAX_GRAINS, std::vector<FilterState>(numChannels));
     currentActiveGrainCount = 0.0f; interruptGate = 1.0f; interruptTimer = 0;
-    for (auto& g : grains) g.active = false;
-
-    grains.resize(256);
-
-    activeGrainIndices.clear();
-    freeGrainIndices.clear();
-    activeGrainIndices.reserve((int)grains.size());
-    freeGrainIndices.reserve((int)grains.size());
-
-    for (int i = 0; i < (int)grains.size(); ++i)
-    {
-        grains[i].active = false;
-        freeGrainIndices.push_back(i);
-    }
-
-    currentActiveGrainCount = 0.0f;
-    interruptGate = 1.0f;
-    interruptTimer = 0;
+    
+    grains.resize(MAX_GRAINS);
+    for (auto& g : grains) g.active.store(false);
 
     pLooperQuant = apvts.getRawParameterValue("LOOPER_QUANT");
     pLooperRepeats = apvts.getRawParameterValue("REPEATS");
@@ -381,53 +366,66 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
 }
 
 void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioProcessorValueTreeState& apvts) {
-    int numSamples = buffer.getNumSamples(); int numChannels = buffer.getNumChannels();
+    const int numSamples = buffer.getNumSamples(); 
+    const int numChannels = buffer.getNumChannels();
+    
+    // Ensure wetBuffer is ready without reallocating every block
+    if (wetBuffer.getNumChannels() < numChannels || wetBuffer.getNumSamples() < numSamples) {
+        wetBuffer.setSize(numChannels, numSamples, false, false, true);
+    }
+    wetBuffer.clear();
+
     updateEnvelopeFollower(buffer);
     
-    smoothActivity.setTargetValue(apvts.getRawParameterValue("ACTIVITY")->load());
-    smoothTime.setTargetValue(apvts.getRawParameterValue("TIME")->load());
-    smoothShape.setTargetValue(apvts.getRawParameterValue("SHAPE")->load());
-    smoothRepeats.setTargetValue(apvts.getRawParameterValue("REPEATS")->load());
-    smoothFilter.setTargetValue(apvts.getRawParameterValue("FILTER")->load());
-    smoothSpace.setTargetValue(apvts.getRawParameterValue("SPACE")->load());
-    smoothMix.setTargetValue(apvts.getRawParameterValue("MIX")->load());
-    smoothGain.setTargetValue(apvts.getRawParameterValue("GAIN")->load());
-    smoothMasterWetVol.setTargetValue(apvts.getRawParameterValue("MASTER_WET_VOL")->load());
-    smoothLoopFade.setTargetValue(apvts.getRawParameterValue("LOOP_FADE")->load());
-    smoothLoopLevel.setTargetValue(apvts.getRawParameterValue("LOOP_LEVEL")->load());
-    smoothSpray.setTargetValue(apvts.getRawParameterValue("SPRAY")->load());
-    smoothSpread.setTargetValue(apvts.getRawParameterValue("SPREAD")->load());
-    smoothPitchJitter.setTargetValue(apvts.getRawParameterValue("PITCH_JITTER")->load());
-    smoothRevProb.setTargetValue(apvts.getRawParameterValue("REV_PROB")->load());
-    smoothModRate.setTargetValue(apvts.getRawParameterValue("MOD_RATE")->load());
-    smoothModDepth.setTargetValue(apvts.getRawParameterValue("MOD_DEPTH")->load());
+    // Cache Parameter Values (Atomic loads once per block)
+    const float activityVal = apvts.getRawParameterValue("ACTIVITY")->load();
+    const float timeVal = apvts.getRawParameterValue("TIME")->load();
+    const float shapeVal = apvts.getRawParameterValue("SHAPE")->load();
+    const float repeatsVal = apvts.getRawParameterValue("REPEATS")->load();
+    const float filterVal = apvts.getRawParameterValue("FILTER")->load();
+    const float spaceVal = apvts.getRawParameterValue("SPACE")->load();
+    const float mixVal = apvts.getRawParameterValue("MIX")->load();
+    const float gainVal = apvts.getRawParameterValue("GAIN")->load();
+    const float masterWet = apvts.getRawParameterValue("MASTER_WET_VOL")->load();
+    const float loopLevelVal = apvts.getRawParameterValue("LOOP_LEVEL")->load();
+    const float sprayVal = apvts.getRawParameterValue("SPRAY")->load();
+    const float spreadVal = apvts.getRawParameterValue("SPREAD")->load();
+    const float jitterVal = apvts.getRawParameterValue("PITCH_JITTER")->load();
+    const float revProbVal = apvts.getRawParameterValue("REV_PROB")->load();
+    const float modRateVal = apvts.getRawParameterValue("MOD_RATE")->load();
+    const float modDepthVal = apvts.getRawParameterValue("MOD_DEPTH")->load();
+    const int algo = (int)apvts.getRawParameterValue("ALGO")->load();
+    const bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
 
-    int algo = (int)apvts.getRawParameterValue("ALGO")->load();
-    bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
-    
-    if (wetBuffer.getNumChannels() != numChannels || wetBuffer.getNumSamples() < numSamples)
-        wetBuffer.setSize(numChannels, numSamples, false, false, true);
-    wetBuffer.clear();
+    smoothActivity.setTargetValue(activityVal);
+    smoothTime.setTargetValue(timeVal);
+    smoothShape.setTargetValue(shapeVal);
+    smoothRepeats.setTargetValue(repeatsVal);
+    smoothFilter.setTargetValue(filterVal);
+    smoothSpace.setTargetValue(spaceVal);
+    smoothMix.setTargetValue(mixVal);
+    smoothGain.setTargetValue(gainVal);
+    smoothMasterWetVol.setTargetValue(masterWet);
+    smoothLoopLevel.setTargetValue(loopLevelVal);
+    smoothSpray.setTargetValue(sprayVal);
+    smoothSpread.setTargetValue(spreadVal);
+    smoothPitchJitter.setTargetValue(jitterVal);
+    smoothRevProb.setTargetValue(revProbVal);
+    smoothModRate.setTargetValue(modRateVal);
+    smoothModDepth.setTargetValue(modDepthVal);
 
     const GrainParams gp{
         pLooperRev->load() > 0.5f,
         pLooperQuant->load() > 0.5f,
-        pLooperRepeats->load(),
-        pLooperSpray->load(),
-        pLooperSpread->load(),
-        pLooperPitchJitter->load(),
-        pLooperRevProb->load(),
+        repeatsVal,
+        sprayVal,
+        spreadVal,
+        jitterVal,
+        revProbVal,
         (int)pLooperWindowType->load()
     };
 
-    float mixVal = smoothMix.getTargetValue(), gainVal = smoothGain.getTargetValue();
-    float masterWet = smoothMasterWetVol.getTargetValue();
-    float repeatsVal = smoothRepeats.getTargetValue();
-    float activityVal = smoothActivity.getTargetValue();
-    float shapeVal = smoothShape.getTargetValue();
-    float timeVal = smoothTime.getTargetValue();
-    float effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
-    
+    const float effectiveTimeMs = 50.0f + (timeVal * 1950.0f);
     int activeGrainsThisBlock = 0;
 
     for (int i = 0; i < numSamples; ++i) {
@@ -455,10 +453,11 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         float winSumL = 0.0f, winSumR = 0.0f;
         float currentSampleL = 0.0f, currentSampleR = 0.0f;
 
-        for (int activePos = 0; activePos < (int)activeGrainIndices.size();)
+        for (int grainIndex = 0; grainIndex < MAX_GRAINS; ++grainIndex)
         {
-            const int grainIndex = activeGrainIndices[(size_t)activePos];
             auto& g = grains[(size_t)grainIndex];
+            if (!g.active.load()) continue;
+
             float phase = g.age / g.length;
             float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase));
             
@@ -481,23 +480,20 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             if (numChannels > 1) currentSampleR += sR;
 
             activeGrainsThisSample++;
-            if (algo == 2) {
-                float instSpeed = g.startSpeed * std::pow(g.endSpeed, phase);
-                g.currentSpeed = instSpeed;
-                g.currentPos += g.reverse ? -instSpeed : instSpeed;
-            } else {
-                g.currentSpeed = g.startSpeed;
-                g.currentPos += g.reverse ? -g.startSpeed : g.startSpeed;
-            }
+            
+            // --- KINEMATIC INTEGRATOR (Expert Phase Accuracy) ---
+            g.velocity += g.acceleration; 
+            g.currentSpeed = g.velocity;
+            g.currentPos += g.reverse ? -g.velocity : g.velocity;
 
             if (g.currentPos < 0.0f) g.currentPos += (float)maxDelaySamples;
             else if (g.currentPos >= (float)maxDelaySamples) g.currentPos -= (float)maxDelaySamples;
             
-            if (++g.age >= g.length) {
-                helpers.releaseActiveGrainByActiveListPosition(activeGrainIndices, freeGrainIndices, grains, activePos);
-                continue;
+            g.age += 1.0f;
+            if (g.age >= g.length) {
+                g.active.store(false);
+                helpers.releaseGrain(grainIndex);
             }
-            ++activePos;
         }
         
         activeGrainsThisBlock = std::max(activeGrainsThisBlock, activeGrainsThisSample);

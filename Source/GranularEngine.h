@@ -137,8 +137,7 @@ private:
     double fs = 44100.0;
     int maxDelaySamples = 0, maxHoldSamples = 0;
     juce::AudioBuffer<float> wetBuffer;
-    std::vector<int> activeGrainIndices;
-    std::vector<int> freeGrainIndices;
+    
     Helpers helpers;
     int recordedSamples = 0;
     BufferReaders bufferReaders;
