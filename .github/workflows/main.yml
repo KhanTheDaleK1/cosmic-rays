@@ -9,7 +9,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Force Node.js 24 for 2026 standards
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -55,8 +54,11 @@ jobs:
         run: pip install tzdata
 
       - name: Generate Fresh Version Timestamp
-        # This MUST run before CMake configuration to ensure filenames match
-        run: python3 generate_version.py
+        id: versioning
+        run: |
+          python3 generate_version.py
+          # Export the version to a GitHub environment variable for later jobs
+          echo "PROJECT_VERSION=$(cat version.txt)" >> $GITHUB_ENV
         shell: bash
 
       - name: Install System Dependencies (Linux)
@@ -102,7 +104,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          # Using a broader glob to ensure we catch the versioned filename
           path: build/*.${{ matrix.package_extension }}
           if-no-files-found: error
           retention-days: 1
@@ -118,21 +119,28 @@ jobs:
         with:
           path: artifacts
 
+      - name: Get Version
+        run: |
+          # We download the artifact to get the version.txt generated in the previous job
+          find artifacts -name "version.txt" | head -n 1 | xargs cat > version.txt || echo "latest" > version.txt
+          echo "RELEASE_VERSION=$(cat version.txt)" >> $GITHUB_ENV
+
       - name: Flatten Artifacts
         run: |
           mkdir release_assets
-          # Find all installers regardless of timestamp
-          find artifacts -name "*.pkg" -exec cp {} release_assets/ \;
-          find artifacts -name "*.exe" -exec cp {} release_assets/ \;
-          find artifacts -name "*.deb" -exec cp {} release_assets/ \;
+          # STRICT FILTER: Only grab the actual CosmicRays installers
+          find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
           ls -R release_assets/
 
-      - name: Create Release
+      - name: Create Historical Release
         uses: softprops/action-gh-release@v2
         with:
           files: release_assets/*
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Latest Deployment Build' }}
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          # This creates a unique release for every single build
+          name: Release ${{ env.RELEASE_VERSION }}
+          tag_name: v${{ env.RELEASE_VERSION }}
           make_latest: true
           draft: false
           prerelease: false
@@ -154,8 +162,8 @@ jobs:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
         run: |
-          # Loop through all downloaded installers and push to Gumroad
-          find artifacts -type f \( -name "*.pkg" -o -name "*.exe" -o -name "*.deb" \) | while read file; do
+          # Only sync the clean installers to Gumroad
+          find artifacts -type f \( -name "CosmicRays-*.pkg" -o -name "CosmicRays-*.exe" -o -name "CosmicRays-*.deb" \) | while read file; do
             filename=$(basename "$file")
             echo "Uploading $filename to Gumroad..."
             curl -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
