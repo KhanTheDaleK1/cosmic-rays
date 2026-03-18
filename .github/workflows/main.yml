@@ -6,9 +6,8 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
-# Force Node.js 24 for 2026 standards
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -93,13 +92,6 @@ jobs:
           cd build
           cpack -C Release
 
-      - name: Debug Output (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          ls -lh build/*.pkg
-          # Verify bundle existence
-          find build/CosmicRays_artefacts -name "*.component" -type d
-
       - name: Upload Native Installer Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -112,8 +104,9 @@ jobs:
     name: Publish GitHub Release
     needs: build_and_package
     runs-on: ubuntu-latest
-    # Trigger on push to main OR tags OR manual dispatch
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    outputs:
+      release_tag: ${{ steps.create_release.outputs.tag_name }}
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
@@ -126,16 +119,42 @@ jobs:
           find artifacts -name "*.pkg" -exec cp {} release_assets/ \;
           find artifacts -name "*.exe" -exec cp {} release_assets/ \;
           find artifacts -name "*.deb" -exec cp {} release_assets/ \;
-          ls -R release_assets/
 
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           files: release_assets/*
-          # If it's a tag use it, otherwise call it 'Latest Build'
           name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Latest Deployment Build' }}
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
           make_latest: true
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  sync_to_gumroad:
+    name: Sync to Gumroad
+    needs: publish_release
+    runs-on: ubuntu-latest
+    if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && vars.GUMROAD_PRODUCT_ID != ''
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to Gumroad
+        env:
+          GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
+          PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
+        run: |
+          # Gumroad API: POST /products/:id/assets
+          # We loop through all generated installers
+          find artifacts -type f \( -name "*.pkg" -o -name "*.exe" -o -name "*.deb" \) | while read file; do
+            filename=$(basename "$file")
+            echo "Uploading $filename to Gumroad..."
+            curl -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
+                 -H "Authorization: Bearer $GUMROAD_TOKEN" \
+                 -F "file=@$file" \
+                 -F "name=$filename"
+          done
