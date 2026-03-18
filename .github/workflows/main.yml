@@ -8,8 +8,12 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Force Node.js 24 for 2026 standards
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
-  contents: write # Required for creating GitHub Releases
+  contents: write
 
 jobs:
   build_and_package:
@@ -35,6 +39,12 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -45,21 +55,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libasound2-dev \
-            libjack-jackd2-dev \
-            libx11-dev \
-            libxcomposite-dev \
-            libxcursor-dev \
-            libxext-dev \
-            libxinerama-dev \
-            libxkbcommon-dev \
-            libxrandr-dev \
-            libxrender-dev \
-            libwebkit2gtk-4.1-dev \
-            libglu1-mesa-dev \
-            mesa-common-dev \
-            freeglut3-dev \
-            ninja-build
+            libasound2-dev libjack-jackd2-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
+            libxinerama-dev libxkbcommon-dev libxrandr-dev libxrender-dev \
+            libfreetype6-dev libcurl4-openssl-dev \
+            libwebkit2gtk-4.1-dev libglu1-mesa-dev mesa-common-dev \
+            freeglut3-dev ninja-build
 
       - name: Install System Dependencies (macOS)
         if: runner.os == 'macOS'
@@ -67,17 +68,26 @@ jobs:
 
       - name: Install System Dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ninja innosetup
+        run: |
+          choco install ninja innosetup
+          echo "C:\Program Files (x86)\Inno Setup 6" >> $GITHUB_PATH
 
       - name: Configure CMake
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
+          else
+            cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          fi
+        shell: bash
 
       - name: Build Plugin
         run: cmake --build build --config Release
 
       - name: Package with CPack
-        working-directory: build
-        run: cpack -C Release
+        run: |
+          cd build
+          cpack -C Release
 
       - name: Upload Native Installer Artifact
         uses: actions/upload-artifact@v4
