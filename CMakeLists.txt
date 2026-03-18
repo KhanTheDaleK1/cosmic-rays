@@ -64,8 +64,7 @@ target_compile_definitions(CosmicRays
     PUBLIC
     JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1
     JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_WEB_BROWSER=0 # Disable web browser to remove heavy Linux dependencies
-    # Enable Stable Linux rendering
+    JUCE_WEB_BROWSER=0 
     $<$<PLATFORM_ID:Linux>:JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1>
 )
 
@@ -83,7 +82,6 @@ if(APPLE)
 elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0)
-    # Note: WebKit is NOT included to ensure stability and compatibility on slim Linux distros
     target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS})
     target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES})
 endif()
@@ -95,21 +93,20 @@ string(STRIP "${VERSION_STR}" VERSION_STR)
 set(CPACK_PACKAGE_NAME "CosmicRays")
 set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
-
-# Force the installer filename to include the version timestamp
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
-    # Using relative paths for relocatable user-local installation
     set(CPACK_PACKAGING_INSTALL_PREFIX "") 
     set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
     set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
 elseif(WIN32)
     set(CPACK_GENERATOR "INNOSETUP")
-    set(PLUGIN_DEST_VST3 "Common Files/VST3")
-    set(PLUGIN_DEST_LV2 "Common Files/LV2")
+    # Force installation to the standard Windows Common Files directory
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "Common Files")
+    set(PLUGIN_DEST_VST3 "VST3")
+    set(PLUGIN_DEST_LV2 "LV2")
 else()
     set(CPACK_GENERATOR "DEB")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Beechem")
