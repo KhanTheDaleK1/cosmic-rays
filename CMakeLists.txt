@@ -98,7 +98,8 @@ set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
-    set(CPACK_PACKAGING_INSTALL_PREFIX "$ENV{HOME}") 
+    # Using relative paths for relocatable user-local installation
+    set(CPACK_PACKAGING_INSTALL_PREFIX "") 
     set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
     set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
