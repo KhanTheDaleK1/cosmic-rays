@@ -123,9 +123,31 @@ set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cosmic Rays Audio Plugin")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 
-install(TARGETS CosmicRays_VST3 DESTINATION "Library/Audio/Plug-Ins/VST3")
-install(TARGETS CosmicRays_AU DESTINATION "Library/Audio/Plug-Ins/Components")
-install(TARGETS CosmicRays_LV2 DESTINATION "Library/Audio/Plug-Ins/LV2")
+# Modern Platform-Specific Plugin Path Logic
+if(APPLE)
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "CosmicRays")
+    set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
+    set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
+    set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
+elseif(WIN32)
+    set(PLUGIN_DEST_VST3 "Common Files/VST3")
+    set(PLUGIN_DEST_LV2 "Common Files/LV2")
+else() # Linux
+    set(PLUGIN_DEST_VST3 "lib/vst3")
+    set(PLUGIN_DEST_LV2 "lib/lv2")
+endif()
+
+if(TARGET CosmicRays_VST3)
+    install(TARGETS CosmicRays_VST3 DESTINATION "${PLUGIN_DEST_VST3}")
+endif()
+
+if(TARGET CosmicRays_AU)
+    install(TARGETS CosmicRays_AU DESTINATION "${PLUGIN_DEST_AU}")
+endif()
+
+if(TARGET CosmicRays_LV2)
+    install(TARGETS CosmicRays_LV2 DESTINATION "${PLUGIN_DEST_LV2}")
+endif()
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
