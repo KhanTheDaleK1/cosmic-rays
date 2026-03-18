@@ -96,6 +96,9 @@ set(CPACK_PACKAGE_NAME "CosmicRays")
 set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 
+# Force the installer filename to include the version timestamp
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
     # Using relative paths for relocatable user-local installation
