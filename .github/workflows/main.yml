@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 
 env:
+  # Force Node.js 24 for 2026 standards
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
@@ -101,7 +102,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: build/CosmicRays-*-${{ matrix.package_extension }}
+          # FIXED: Added the dot before the extension
+          path: build/CosmicRays-*.${{ matrix.package_extension }}
           if-no-files-found: error
           retention-days: 1
 
