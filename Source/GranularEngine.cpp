@@ -142,12 +142,13 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
 
     int spawnCount = (algo == 0 || algo == 3) ? (int)(1 + activity * 12.0f) : 1;
     for (int s = 0; s < spawnCount; ++s) {
-        const int grainIndex = helpers.acquireFreeGrain(activeGrainIndices, freeGrainIndices, grains);
+        const int grainIndex = helpers.acquireFreeGrain();
         if (grainIndex < 0)
             break; 
 
         auto& g = grains[(size_t)grainIndex];
-        g.active = true; g.age = 0.0f; g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+        g.active = true; g.age = 0.0f; 
+        g.velocity = 1.0f; g.targetVelocity = 1.0f; g.acceleration = 0.0f;
         g.internalPhase = dist(rng);
         g.reverse = (dist(rng) < revProb) ? !globalRev : globalRev;
         g.filterCutoff = 1.0f; g.bitCrush = 1.0f; g.isSustainer = false;
@@ -161,177 +162,161 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
 
         if (algo == 0) {
             // Mosaic: Overlapping loops at different speeds
-            if (mode == 0)      g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 2.0f; // Normal / Double
-            else if (mode == 1) g.startSpeed = (dist(rng) < 0.5f) ? 1.0f : 0.5f; // Normal / Half
-            else if (mode == 2) g.startSpeed = 2.0f;                             // Pure Octave Up
+            if (mode == 0)      g.velocity = (dist(rng) < 0.5f) ? 1.0f : 2.0f; 
+            else if (mode == 1) g.velocity = (dist(rng) < 0.5f) ? 1.0f : 0.5f; 
+            else if (mode == 2) g.velocity = 2.0f;                             
             else { 
                 float ss[] = { 0.5f, 1.0f, 2.0f }; 
-                g.startSpeed = ss[(int)(dist(rng) * 3.0f)];                     // Massive Blend
+                g.velocity = ss[(int)(dist(rng) * 3.0f)];                     
             }
-            g.endSpeed = g.startSpeed; 
+            g.targetVelocity = g.velocity; 
             g.length = lenBase * (0.8f + repeats * 4.0f);
         }
         else if (algo == 1) {
             // Seq: Rearranged rhythmic sequences
             g.length = lenBase * (0.4f + repeats * 2.0f);
             if (mode == 0) {
-                // Alternating normal/half (Activity = bounce)
-                g.startSpeed = (stepCount % 2 == 0) ? 1.0f : 0.5f;
-                if (dist(rng) > activity) g.startSpeed = 1.0f; // Stability override
+                g.velocity = (stepCount % 2 == 0) ? 1.0f : 0.5f;
+                if (dist(rng) > activity) g.velocity = 1.0f; 
             }
             else if (mode == 1) {
-                // Arpeggiated sequence (major-ish intervals)
-                float arp[] = { 1.0f, 1.25f, 1.5f, 2.0f }; // 1, 3, 5, 8
-                g.startSpeed = arp[stepCount % 4];
+                float arp[] = { 1.0f, 1.25f, 1.5f, 2.0f }; 
+                g.velocity = arp[stepCount % 4];
             }
             else if (mode == 2) {
-                // Alternating shifts (Fifths / Complex)
-                g.startSpeed = (stepCount % 2 == 0) ? 1.5f : 1.0f; // 5th / Unity
+                g.velocity = (stepCount % 2 == 0) ? 1.5f : 1.0f; 
             }
             else {
-                // Random sequence steps
                 float choices[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f };
-                g.startSpeed = choices[(int)(dist(rng) * 6.0f)];
+                g.velocity = choices[(int)(dist(rng) * 6.0f)];
             }
-            g.endSpeed = g.startSpeed;
+            g.targetVelocity = g.velocity;
         }
         else if (algo == 2) {
-            // Glide: Pitch shifting over time
+            // Glide: Ballistic Pitch Trajectory (Expert Physics)
             g.length = lenBase * (1.0f + repeats * 8.0f);
-            if (mode == 0) { g.startSpeed = 1.0f; g.endSpeed = 0.5f; } // Downward
-            else if (mode == 1) { g.startSpeed = 1.0f; g.endSpeed = 2.0f; } // Upward
-            else if (mode == 2) { 
-                // Simultaneous Up/Down
-                bool up = dist(rng) < 0.5f;
-                g.startSpeed = 1.0f; g.endSpeed = up ? 1.2f : 0.8f; 
-            }
+            g.velocity = 1.0f;
+            if (mode == 0)      g.targetVelocity = 0.5f; 
+            else if (mode == 1) g.targetVelocity = 2.0f; 
+            else if (mode == 2) g.targetVelocity = (dist(rng) < 0.5f) ? 1.2f : 0.8f; 
             else {
-                // Stepped Pitch Bending
                 float intervals[] = { 1.0f, 1.25f, 1.5f, 2.0f, 1.0f, 0.75f, 0.5f };
-                g.startSpeed = intervals[stepCount % 7];
-                g.endSpeed = g.startSpeed; // No smooth glide in Mode D
+                g.velocity = intervals[stepCount % 7];
+                g.targetVelocity = g.velocity;
             }
+            // Acceleration (dV/dt) over grain duration
+            g.acceleration = (g.targetVelocity - g.velocity) / g.length;
         }
         else if (algo == 3) {
             // Haze: Atmospheric clouds
             g.length = lenBase * (1.5f + repeats * 5.0f);
-            if (mode == 0)      g.startSpeed = 1.0f; 
-            else if (mode == 1) g.startSpeed = (dist(rng) < 0.6f) ? 0.5f : 1.0f; // Lower octave mix
-            else if (mode == 2) g.startSpeed = (dist(rng) < 0.6f) ? 2.0f : 1.0f; // Higher octave mix
+            if (mode == 0)      g.velocity = 1.0f; 
+            else if (mode == 1) g.velocity = (dist(rng) < 0.6f) ? 0.5f : 1.0f; 
+            else if (mode == 2) g.velocity = (dist(rng) < 0.6f) ? 2.0f : 1.0f; 
             else {
                 float ss[] = { 0.5f, 1.0f, 2.0f };
-                g.startSpeed = ss[(int)(dist(rng) * 3.0f)]; // Morphing high/low
+                g.velocity = ss[(int)(dist(rng) * 3.0f)]; 
             }
-            g.endSpeed = g.startSpeed;
+            g.targetVelocity = g.velocity;
             g.filterCutoff = 0.5f + (1.0f - activity) * 0.4f;
         }
         else if (algo == 4) {
             // Tunnel: Resonant drones
             g.length = lenBase * (4.0f + repeats * 10.0f);
-            if (mode == 0)      g.startSpeed = 1.0f;
-            else if (mode == 1) g.startSpeed = 0.5f; // Sub-harmonics
+            if (mode == 0)      g.velocity = 1.0f;
+            else if (mode == 1) g.velocity = 0.5f; 
             else if (mode == 2) {
-                // Pulsing tremolo via length modulation
                 g.length *= (0.8f + 0.4f * std::sin(grainClock * 0.1f));
-                g.startSpeed = 1.0f;
+                g.velocity = 1.0f;
             }
             else {
-                // Evolving (drifting pitch)
-                g.startSpeed = 1.0f + (std::sin(grainClock * 0.05f) * 0.05f);
+                g.velocity = 1.0f + (std::sin(grainClock * 0.05f) * 0.05f);
             }
-            g.endSpeed = g.startSpeed;
+            g.targetVelocity = g.velocity;
         }
         else if (algo == 5) {
             // Strum: Pointillistic plucked textures
-            g.length = 1500.0f + (activity * 3000.0f); // Short, plucked
-            if (mode == 0)      g.startSpeed = 1.0f;
-            else if (mode == 1) g.startSpeed = 0.5f; // Bass plucks
-            else if (mode == 2) g.startSpeed = 2.0f; // Mandolin / High plucks
+            g.length = 1500.0f + (activity * 3000.0f); 
+            if (mode == 0)      g.velocity = 1.0f;
+            else if (mode == 1) g.velocity = 0.5f; 
+            else if (mode == 2) g.velocity = 2.0f; 
             else {
                 float ss[] = { 0.5f, 1.0f, 2.0f, 4.0f };
-                g.startSpeed = ss[(int)(dist(rng) * 4.0f)]; // Random octaves
+                g.velocity = ss[(int)(dist(rng) * 4.0f)]; 
             }
-            g.endSpeed = g.startSpeed;
-            g.windowType = 2; // Sharp attack (Percussive)
+            g.targetVelocity = g.velocity;
+            g.windowType = 2; 
         }
         else if (algo == 6) {
             // Blocks: Predictable glitches
             g.length = samplesPerStep * (0.5f + activity); 
-            if (mode == 0)      g.startSpeed = 1.0f;
-            else if (mode == 1) g.startSpeed = 0.5f; // Pitched down
-            else if (mode == 2) g.startSpeed = 2.0f; // Pitched up
+            if (mode == 0)      g.velocity = 1.0f;
+            else if (mode == 1) g.velocity = 0.5f; 
+            else if (mode == 2) g.velocity = 2.0f; 
             else {
-                g.startSpeed = (dist(rng) < 0.5f) ? 1.5f : 1.0f;
-                g.reverse = (dist(rng) < 0.3f); // Max chaos
+                g.velocity = (dist(rng) < 0.5f) ? 1.5f : 1.0f;
+                g.reverse = (dist(rng) < 0.3f); 
             }
-            g.endSpeed = g.startSpeed;
-            g.windowType = 3; // Square/Block window
+            g.targetVelocity = g.velocity;
+            g.windowType = 3; 
         }
         else if (algo == 7) {
             // Interrupt: Sparse signal replacements
             g.length = lenBase * 0.5f;
-            if (mode == 0)      { g.startSpeed = 1.0f; }
-            else if (mode == 1) { g.startSpeed = 1.0f; g.filterCutoff = 0.2f; } // Muffled
-            else if (mode == 2) { g.startSpeed = 1.0f; g.filterCutoff = 0.8f; g.brightness = 2.0f; } // Tinny (HPF-like)
+            if (mode == 0)      { g.velocity = 1.0f; }
+            else if (mode == 1) { g.velocity = 1.0f; g.filterCutoff = 0.2f; } 
+            else if (mode == 2) { g.velocity = 1.0f; g.filterCutoff = 0.8f; g.brightness = 2.0f; } 
             else {
-                g.startSpeed = (dist(rng) < 0.5f) ? 0.5f : 2.0f; // Montage
+                g.velocity = (dist(rng) < 0.5f) ? 0.5f : 2.0f; 
                 g.length *= 0.5f;
             }
-            g.endSpeed = g.startSpeed;
+            g.targetVelocity = g.velocity;
         }
         else if (algo == 8) {
             // Arp: Sequenced runs
             g.length = lenBase * 0.3f;
             if (mode == 0) {
-                // Rising/Falling
                 float seq[] = { 1.0f, 1.25f, 1.5f, 2.0f, 1.5f, 1.25f };
-                g.startSpeed = seq[stepCount % 6];
+                g.velocity = seq[stepCount % 6];
             }
             else if (mode == 1) {
-                // Major / Bright
-                float seq[] = { 1.0f, 1.25f, 1.5f, 1.875f }; // 1, 3, 5, 7
-                g.startSpeed = seq[stepCount % 4];
+                float seq[] = { 1.0f, 1.25f, 1.5f, 1.875f }; 
+                g.velocity = seq[stepCount % 4];
             }
             else if (mode == 2) {
-                // Minor / Dark
-                float seq[] = { 1.0f, 1.2f, 1.5f, 1.8f }; // 1, b3, 5, b7
-                g.startSpeed = seq[stepCount % 4];
+                float seq[] = { 1.0f, 1.2f, 1.5f, 1.8f }; 
+                g.velocity = seq[stepCount % 4];
             }
             else {
-                // Randomized "Drunk"
                 static int lastStep = 0;
                 lastStep = juce::jlimit(0, 7, lastStep + (dist(rng) < 0.5f ? -1 : 1));
                 float scales[] = { 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 4.0f };
-                g.startSpeed = scales[lastStep];
+                g.velocity = scales[lastStep];
             }
-            g.endSpeed = g.startSpeed;
+            g.targetVelocity = g.velocity;
         }
         else if (algo == 9) {
             // Pattern: Rhythmic delay taps
             g.length = lenBase * 0.5f;
-            if (mode == 0)      offset = samplesPerStep * 3.0f; // Dotted 8th sync
-            else if (mode == 1) offset = samplesPerStep * 0.666f; // Triplet gallop
-            else if (mode == 2) offset = samplesPerStep * (float)(stepCount % 4 + 1) * 0.5f; // Polyrhythmic
-            else                offset = (float)fs * 0.05f * (float)(dist(rng) * 10.0f); // Reverb-like wall
+            if (mode == 0)      offset = samplesPerStep * 3.0f; 
+            else if (mode == 1) offset = samplesPerStep * 0.666f; 
+            else if (mode == 2) offset = samplesPerStep * (float)(stepCount % 4 + 1) * 0.5f; 
+            else                offset = (float)fs * 0.05f * (float)(dist(rng) * 10.0f); 
             
-            g.startSpeed = 1.0f; g.endSpeed = 1.0f;
+            g.velocity = 1.0f; g.targetVelocity = 1.0f;
         }
         else if (algo == 10) {
-            // Warp: Filtered/Pitched delays
+            // Warp: Tape Drift
             g.length = lenBase * 0.8f;
-            if (mode == 0) { 
-                // Degraded filtering
-                g.filterCutoff = 0.4f; 
-                g.startSpeed = 1.0f; 
-            }
-            else if (mode == 1) { g.startSpeed = 1.0f; g.endSpeed = 0.95f; } // Melting down
-            else if (mode == 2) { g.startSpeed = 1.0f; g.endSpeed = 1.05f; } // Rising shimmer
+            g.velocity = 1.0f;
+            if (mode == 1) g.targetVelocity = 0.95f; 
+            else if (mode == 2) g.targetVelocity = 1.05f; 
             else {
-                // Tape Warp (Wow/Flutter)
                 float flutter = std::sin(grainClock * 0.2f) * 0.02f;
-                g.startSpeed = 1.0f + flutter;
+                g.velocity = 1.0f + flutter;
+                g.targetVelocity = g.velocity;
             }
-            g.endSpeed = g.startSpeed;
+            g.acceleration = (g.targetVelocity - g.velocity) / g.length;
         }
 
         g.length = std::max(100.0f, std::min(g.length, (float)maxDelaySamples - 100.0f));
@@ -536,9 +521,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     currentActiveGrainCount = alphaCount * (float)activeGrainsThisBlock + (1.0f - alphaCount) * currentActiveGrainCount;
     
     juce::dsp::AudioBlock<float> outputBlock(buffer); 
-    float filterVal = smoothFilter.getNextValue();
     float resVal = apvts.getRawParameterValue("RESONANCE")->load();
-    float spaceVal = smoothSpace.getNextValue();
     
     float cutoffFreq = 20.0f * std::pow(1000.0f, filterVal);
     auto& filter = fxChain.get<0>();

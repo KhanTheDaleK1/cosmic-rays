@@ -43,7 +43,7 @@ struct Grain {
     int windowType = 0;         
     
     // State Flags
-    std::atomic<bool> active { false }; 
+    bool active = false; 
     bool reverse = false;       
 
     // Per-grain modifiers
