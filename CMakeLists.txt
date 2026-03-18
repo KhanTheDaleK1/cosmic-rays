@@ -64,7 +64,8 @@ target_compile_definitions(CosmicRays
     PUBLIC
     JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1
     JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0
-    $<$<PLATFORM_ID:Linux>:JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1 JUCE_OPENGL=1>
+    # Enable Stable Linux rendering
+    $<$<PLATFORM_ID:Linux>:JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1>
 )
 
 target_link_libraries(CosmicRays
@@ -81,9 +82,9 @@ if(APPLE)
 elseif(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0)
-    pkg_check_modules(WEBKIT REQUIRED webkit2gtk-4.1)
-    target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT_INCLUDE_DIRS})
-    target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES} ${WEBKIT_LIBRARIES})
+    # Note: WebKit is NOT included to ensure stability and compatibility on slim Linux distros
+    target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS})
+    target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES})
 endif()
 
 # --- CPack & Installation ---
