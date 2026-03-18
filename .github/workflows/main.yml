@@ -53,6 +53,11 @@ jobs:
         if: runner.os == 'Windows'
         run: pip install tzdata
 
+      - name: Generate Fresh Version Timestamp
+        # This MUST run before CMake configuration to ensure filenames match
+        run: python3 generate_version.py
+        shell: bash
+
       - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -96,7 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: build/*.${{ matrix.package_extension }}
+          path: build/CosmicRays-*-${{ matrix.package_extension }}
           if-no-files-found: error
           retention-days: 1
 
@@ -105,8 +110,6 @@ jobs:
     needs: build_and_package
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-    outputs:
-      release_tag: ${{ steps.create_release.outputs.tag_name }}
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
@@ -116,12 +119,13 @@ jobs:
       - name: Flatten Artifacts
         run: |
           mkdir release_assets
-          find artifacts -name "*.pkg" -exec cp {} release_assets/ \;
-          find artifacts -name "*.exe" -exec cp {} release_assets/ \;
-          find artifacts -name "*.deb" -exec cp {} release_assets/ \;
+          # Capture all versioned installers
+          find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
+          ls -R release_assets/
 
       - name: Create Release
-        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           files: release_assets/*
@@ -148,9 +152,7 @@ jobs:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
         run: |
-          # Gumroad API: POST /products/:id/assets
-          # We loop through all generated installers
-          find artifacts -type f \( -name "*.pkg" -o -name "*.exe" -o -name "*.deb" \) | while read file; do
+          find artifacts -type f \( -name "CosmicRays-*.pkg" -o -name "CosmicRays-*.exe" -o -name "CosmicRays-*.deb" \) | while read file; do
             filename=$(basename "$file")
             echo "Uploading $filename to Gumroad..."
             curl -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
