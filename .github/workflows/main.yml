@@ -1,23 +1,29 @@
-name: Build & Test
+name: Cosmic Rays CI/CD - 2026 Deployment Standard
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
+  build_and_package:
+    name: Build & Package on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-
-    permissions:
-      contents: read
-      actions: read
+        include:
+          - os: macos-latest
+            artifact_name: macOS-Installer
+            package_extension: pkg
+          - os: windows-latest
+            artifact_name: Windows-Installer
+            package_extension: exe
+          - os: ubuntu-latest
+            artifact_name: Linux-Installer
+            package_extension: deb
 
     steps:
       - name: Checkout Code
@@ -25,17 +31,55 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Linux Dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install System Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libcurl4-openssl-dev libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libwebkit2gtk-4.1-dev libglu1-mesa-dev mesa-common-dev freeglut3-dev
+          sudo apt-get install -y \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxkbcommon-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libwebkit2gtk-4.1-dev \
+            libglu1-mesa-dev \
+            mesa-common-dev \
+            freeglut3-dev \
+            ninja-build
 
-      - name: Setup CMake
-        uses: jwlawrence/actions-setup-cmake@v2
+      - name: Install System Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install System Dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja innosetup
 
       - name: Configure CMake
+        # We use -G Ninja for faster CI builds
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build Plugin
         run: cmake --build build --config Release
+
+      - name: Package with CPack
+        working-directory: build
+        run: cpack -C Release
+
+      - name: Upload Native Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: build/*.${{ matrix.package_extension }}
+          if-no-files-found: error
+          retention-days: 7

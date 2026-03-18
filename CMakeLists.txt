@@ -1,9 +1,17 @@
-cmake_minimum_required(VERSION 3.24) # Updated for CPM/Modern JUCE
+cmake_minimum_required(VERSION 3.27) # Updated for CPack InnoSetup Generator & CPM/Modern JUCE
 
-project(CosmicRays VERSION 0.0.1 LANGUAGES CXX C)
+project(CosmicRays VERSION 1.0.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20) # 2026 Standard
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# --- Static Linking ---
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+elseif(UNIX AND NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+endif()
 
 # --- CPM.cmake for Modern Dependency Management ---
 include(cmake/CPM.cmake)
@@ -105,3 +113,27 @@ elseif(UNIX AND NOT APPLE)
     target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS} ${WEBKIT_INCLUDE_DIRS})
     target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES} ${WEBKIT_LIBRARIES})
 endif()
+
+# --- CPack Configuration ---
+install(TARGETS CosmicRays_VST3 DESTINATION "Library/Audio/Plug-Ins/VST3")
+install(TARGETS CosmicRays_AU DESTINATION "Library/Audio/Plug-Ins/Components")
+install(TARGETS CosmicRays_LV2 DESTINATION "Library/Audio/Plug-Ins/LV2")
+
+set(CPACK_PACKAGE_NAME "CosmicRays")
+set(CPACK_PACKAGE_VENDOR "Beechem")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Cosmic Rays Audio Plugin")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+
+if(APPLE)
+    set(CPACK_GENERATOR "productbuild")
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/")
+elseif(WIN32)
+    # INNOSETUP requires CMake 3.27+
+    set(CPACK_GENERATOR "INNOSETUP")
+elseif(UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Beechem")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+endif()
+
+include(CPack)
