@@ -69,7 +69,7 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     currentActiveGrainCount = 0.0f; interruptGate = 1.0f; interruptTimer = 0;
     
     grains.resize(MAX_GRAINS);
-    for (auto& g : grains) g.active.store(false);
+    for (auto& g : grains) g.active = false;
 
     pLooperQuant = apvts.getRawParameterValue("LOOPER_QUANT");
     pLooperRepeats = apvts.getRawParameterValue("REPEATS");
@@ -441,7 +441,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
         for (int grainIndex = 0; grainIndex < MAX_GRAINS; ++grainIndex)
         {
             auto& g = grains[(size_t)grainIndex];
-            if (!g.active.load()) continue;
+            if (!g.active) continue;
 
             float phase = g.age / g.length;
             float window = 0.5f * (1.0f - std::cos(juce::MathConstants<float>::twoPi * phase));
@@ -476,7 +476,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
             
             g.age += 1.0f;
             if (g.age >= g.length) {
-                g.active.store(false);
+                g.active = false;
                 helpers.releaseGrain(grainIndex);
             }
         }
