@@ -157,22 +157,31 @@ jobs:
         with:
           path: artifacts
 
-      - name: Update Gumroad Assets
+      - name: Link GitHub Assets to Gumroad
         env:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
         run: |
-          # 1. List current assets on Gumroad (to potentially delete old versions)
-          # Note: Gumroad API is additive by default. To keep it clean, 
-          # we just upload the new ones with the timestamped names.
+          # Instead of uploading (which hits a 413 error), we link directly to the GitHub Release assets.
+          # This is faster and avoids size limits.
           
-          find artifacts -type f \( -name "CosmicRays-*.pkg" -o -name "CosmicRays-*.exe" -o -name "CosmicRays-*.deb" \) | while read file; do
-            filename=$(basename "$file")
-            echo "Uploading $filename to Gumroad product $PRODUCT_ID..."
+          # We'll link the three main installers
+          PLATFORMS=("Windows" "Darwin" "Linux")
+          EXTENSIONS=("exe" "pkg" "deb")
+          
+          for i in "${!PLATFORMS[@]}"; do
+            PLATFORM=${PLATFORMS[$i]}
+            EXT=${EXTENSIONS[$i]}
             
-            # Upload new asset
-            curl -s -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
+            # Construct the exact URL for the asset in the GitHub Release
+            # Note: We use the RELEASE_VERSION gathered in the previous step
+            ASSET_URL="https://github.com/KhanTheDaleK1/cosmic-rays/releases/download/v${RELEASE_VERSION}/CosmicRays-${RELEASE_VERSION}-${PLATFORM}.${EXT}"
+            
+            echo "Linking $PLATFORM installer ($ASSET_URL) to Gumroad..."
+            
+            curl -s -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/external_files" \
                  -H "Authorization: Bearer $GUMROAD_TOKEN" \
-                 -F "file=@$file" \
-                 -F "name=$filename"
+                 -d "url=$ASSET_URL" \
+                 -d "name=Cosmic Rays Beta (${PLATFORM})"
           done
