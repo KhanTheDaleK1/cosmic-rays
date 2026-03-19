@@ -137,61 +137,39 @@ jobs:
           find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
           find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
           find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
-          ls -R release_assets/
+          
+          # Rename for generic 'latest' links
+          cd release_assets
+          mv CosmicRays-${{ env.RELEASE_VERSION }}-Windows.exe CosmicRays-Windows.exe || true
+          mv CosmicRays-${{ env.RELEASE_VERSION }}-Darwin.pkg CosmicRays-Darwin.pkg || true
+          mv CosmicRays-${{ env.RELEASE_VERSION }}-Linux.deb CosmicRays-Linux.deb || true
+          ls -R .
 
-      - name: Create Historical Release
+      - name: Wipe and Recreate Latest Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Delete the existing 'latest' release if it exists
+          gh release delete latest -y --cleanup-tag || true
+          
+          # 2. Create the new clean release
+          gh release create latest \
+            --title "Cosmic Rays Beta - ${{ env.RELEASE_VERSION }}" \
+            --notes "Freshly compiled on ${{ env.RELEASE_VERSION }}. Includes macOS, Windows, and Linux installers." \
+            --prerelease \
+            release_assets/CosmicRays-Windows.exe \
+            release_assets/CosmicRays-Darwin.pkg \
+            release_assets/CosmicRays-Linux.deb
+
+      - name: Create Historical Version Tag
         uses: softprops/action-gh-release@v2
         with:
-          files: release_assets/*
           name: Release ${{ env.RELEASE_VERSION }}
           tag_name: v${{ env.RELEASE_VERSION }}
           make_latest: false
           draft: false
           prerelease: false
           generate_release_notes: true
-
-      - name: Clean Latest Release Assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Use the GitHub CLI to list and delete ALL assets from 'latest'
-          # This ensures that we NEVER have more than 5 files total.
-          
-          echo "Fetching assets for tag 'latest'..."
-          gh release view latest --json assets --jq '.assets[].name' > assets_to_delete.txt || true
-          
-          if [ -s assets_to_delete.txt ]; then
-            while read -r asset; do
-              echo "Deleting old asset: $asset"
-              gh release delete-asset latest "$asset" -y || true
-            done < assets_to_delete.txt
-          else
-            echo "No assets found in 'latest' release."
-          fi
-
-      - name: Rename for Latest
-        run: |
-          cd release_assets
-          # Use the RELEASE_VERSION to find the exact files to rename
-          cp CosmicRays-${{ env.RELEASE_VERSION }}-Windows.exe CosmicRays-Windows.exe || true
-          cp CosmicRays-${{ env.RELEASE_VERSION }}-Darwin.pkg CosmicRays-Darwin.pkg || true
-          cp CosmicRays-${{ env.RELEASE_VERSION }}-Linux.deb CosmicRays-Linux.deb || true
-
-      - name: Update Latest Release
-        uses: softprops/action-gh-release@v2
-        with:
-          # ONLY upload the generic files to 'latest'
-          files: |
-            release_assets/CosmicRays-Windows.exe
-            release_assets/CosmicRays-Darwin.pkg
-            release_assets/CosmicRays-Linux.deb
-          name: Latest Beta Release
-          tag_name: latest
-          make_latest: true
-          draft: false
-          prerelease: true
-          append_body: false
-          overwrite: true
 
   sync_to_gumroad:
     name: Sync to Gumroad
