@@ -119,6 +119,11 @@ jobs:
         with:
           path: artifacts
 
+      - name: Configure Bot Identity
+        run: |
+          git config --global user.name "Cosmic Rays Bot"
+          git config --global user.email "bot@cosmic.audio"
+
       - name: Get Version
         run: |
           # We download the artifact to get the version.txt generated in the previous job
@@ -145,36 +150,41 @@ jobs:
           prerelease: false
           generate_release_notes: true
 
+      - name: Clean Latest Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # List all assets in the 'latest' release and delete them one by one
+          # This clears out the "20 items" clutter completely.
+          assets=$(gh release view latest --json assets --jq '.assets[].name' 2>/dev/null || echo "")
+          for asset in $assets; do
+            echo "Deleting old asset: $asset"
+            gh release delete-asset latest "$asset" -y
+          done
+
       - name: Update Latest Release
         uses: softprops/action-gh-release@v2
         with:
+          # ONLY upload the generic files to 'latest'
+          # We rename them first in the next step
           files: |
-            release_assets/CosmicRays-*-Windows.exe
-            release_assets/CosmicRays-*-Darwin.pkg
-            release_assets/CosmicRays-*-Linux.deb
+            release_assets/CosmicRays-Windows.exe
+            release_assets/CosmicRays-Darwin.pkg
+            release_assets/CosmicRays-Linux.deb
           name: Latest Beta Release
           tag_name: latest
           make_latest: true
           draft: false
           prerelease: true
           append_body: false
-        # We use a separate step to rename them for the 'latest' tag links
-      - name: Rename for Permanent Links
-        run: |
-          cd release_assets
-          mv CosmicRays-*-Windows.exe CosmicRays-Windows.exe || true
-          mv CosmicRays-*-Darwin.pkg CosmicRays-Darwin.pkg || true
-          mv CosmicRays-*-Linux.deb CosmicRays-Linux.deb || true
-          
-      - name: Upload Permanent Links to Latest
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release_assets/CosmicRays-Windows.exe
-            release_assets/CosmicRays-Darwin.pkg
-            release_assets/CosmicRays-Linux.deb
-          tag_name: latest
-          overwrite: true
+        # Pre-step: Rename for the specific 'latest' upload
+        before_steps:
+          - name: Rename for Latest
+            run: |
+              cd release_assets
+              cp CosmicRays-*-Windows.exe CosmicRays-Windows.exe
+              cp CosmicRays-*-Darwin.pkg CosmicRays-Darwin.pkg
+              cp CosmicRays-*-Linux.deb CosmicRays-Linux.deb
 
   sync_to_gumroad:
     name: Sync to Gumroad
