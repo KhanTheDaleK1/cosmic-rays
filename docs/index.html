@@ -491,7 +491,7 @@
     </nav>
 
     <section class="hero">
-        <div class="badge" id="release-badge">BETA v19.03.2026-0810 AVAILABLE NOW</div>
+        <div class="badge" id="release-badge">BETA v19.03.2026-0905 AVAILABLE NOW</div>
         <h1>Sculpt Sound <br> From The Void.</h1>
         <p>A professional-grade granular processor for macOS, Linux, and Windows. Engineered for infinite sonic exploration in VST3 and LV2 environments.</p>
         <div class="cta-group">
@@ -775,9 +775,13 @@
                 const data = await response.json();
                 
                 // Update Badge
-                if (data.tag_name) {
+                if (data.tag_name && data.tag_name.length > 1) {
                     const tag = data.tag_name.startsWith('v') ? data.tag_name : `v${data.tag_name}`;
-                    releaseBadge.innerText = `BETA ${tag} AVAILABLE NOW`;
+                    // If the tag is just 'latest', we might want to check the actual version number 
+                    // from the release title or just skip the update.
+                    if (tag !== 'vlatest' && tag !== 'v') {
+                        releaseBadge.innerText = `BETA ${tag} AVAILABLE NOW`;
+                    }
                 }
 
                 // Find the right installer for the current OS
