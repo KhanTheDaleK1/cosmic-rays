@@ -162,11 +162,18 @@ jobs:
             gh release delete-asset latest "$asset" -y
           done
 
+      - name: Rename for Latest
+        run: |
+          cd release_assets
+          # Use the RELEASE_VERSION to find the exact files to rename
+          cp CosmicRays-${{ env.RELEASE_VERSION }}-Windows.exe CosmicRays-Windows.exe || true
+          cp CosmicRays-${{ env.RELEASE_VERSION }}-Darwin.pkg CosmicRays-Darwin.pkg || true
+          cp CosmicRays-${{ env.RELEASE_VERSION }}-Linux.deb CosmicRays-Linux.deb || true
+
       - name: Update Latest Release
         uses: softprops/action-gh-release@v2
         with:
           # ONLY upload the generic files to 'latest'
-          # We rename them first in the next step
           files: |
             release_assets/CosmicRays-Windows.exe
             release_assets/CosmicRays-Darwin.pkg
@@ -177,14 +184,7 @@ jobs:
           draft: false
           prerelease: true
           append_body: false
-        # Pre-step: Rename for the specific 'latest' upload
-        before_steps:
-          - name: Rename for Latest
-            run: |
-              cd release_assets
-              cp CosmicRays-*-Windows.exe CosmicRays-Windows.exe
-              cp CosmicRays-*-Darwin.pkg CosmicRays-Darwin.pkg
-              cp CosmicRays-*-Linux.deb CosmicRays-Linux.deb
+          overwrite: true
 
   sync_to_gumroad:
     name: Sync to Gumroad
