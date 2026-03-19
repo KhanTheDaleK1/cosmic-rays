@@ -36,4 +36,6 @@ JUCE/
 # Gemini
 GEMINI.md
 
-GEMINI.md
+# Secrets & Environment
+.env
+.env.local

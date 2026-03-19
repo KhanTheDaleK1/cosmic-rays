@@ -8,5 +8,7 @@ database_name = "cosmic-rays-db"
 database_id = "260a0a66-2659-493a-b221-8f266457eb3d"
 
 [vars]
-ADMIN_API_KEY = "cr_admin_7b2ff7_!void"
+# Use `wrangler secret put ADMIN_API_KEY` to set this securely.
+# Do NOT hardcode secrets here.
+ADMIN_API_KEY = "cr_admin_REDACTED_!void"
 # DISCORD_WEBHOOK_URL = "your_webhook_here"
