@@ -1,0 +1,33 @@
+# .github/dependabot.yml
+# Dependabot configuration for Cosmic Rays (CPM, Python, and Actions)
+
+version: 2
+updates:
+  # 1. GitHub Actions (Weekly updates)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # 2. Python Dependencies (for versioning and deployment scripts)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # 3. C++ / CMake via GitHub Releases (for JUCE)
+  # Since CPM.cmake pulls from GitHub, we monitor the repo directly.
+  - package-ecosystem: "github-actions" # Special use-case for repository monitoring
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "juce-framework/JUCE"
+        update-types: ["version-update:semver-major"] # Prevent breaking changes from JUCE 9+ for now
