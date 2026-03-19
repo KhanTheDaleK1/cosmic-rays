@@ -26,7 +26,7 @@ def generate_version_string():
     
     return version_str
 
-def write_to_header(version_str, filepath="Source/Version.h"):
+def write_to_header(version_str, filepath="source/Version.h"):
     """
     Writes the generated version string to a C++ header file.
     """
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     print(f"Generated Version: {current_version}")
     
     # Update Version.h
-    target_path = sys.argv[1] if len(sys.argv) > 1 else "Source/Version.h"
+    target_path = sys.argv[1] if len(sys.argv) > 1 else "source/Version.h"
     write_to_header(current_version, target_path)
     
     # Update version.txt

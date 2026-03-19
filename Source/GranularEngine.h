@@ -175,12 +175,4 @@ private:
     Helpers helpers;
     int recordedSamples = 0;
     BufferReaders bufferReaders;
-    std::atomic<float>* pLooperRev;
-    std::atomic<float>* pLooperQuant;
-    std::atomic<float>* pLooperRepeats;
-    std::atomic<float>* pLooperSpray;
-    std::atomic<float>* pLooperSpread;
-    std::atomic<float>* pLooperPitchJitter;
-    std::atomic<float>* pLooperRevProb;
-    std::atomic<float>* pLooperWindowType;
 };

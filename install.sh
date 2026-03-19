@@ -6,7 +6,7 @@
 set -e
 
 # Run version generation script to ensure it's up to date
-python3 Scripts/generate_version.py
+python3 cmake/generate_version.py
 
 # Read the current version
 VERSION=$(cat version.txt)

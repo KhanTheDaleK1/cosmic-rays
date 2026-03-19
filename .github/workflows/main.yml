@@ -56,7 +56,7 @@ jobs:
       - name: Generate Fresh Version Timestamp
         id: versioning
         run: |
-          python3 Scripts/generate_version.py
+          python3 cmake/generate_version.py
           # Export the version to a GitHub environment variable for later jobs
           echo "PROJECT_VERSION=$(cat version.txt)" >> $GITHUB_ENV
         shell: bash

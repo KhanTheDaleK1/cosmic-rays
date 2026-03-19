@@ -55,7 +55,7 @@ cmake --build build --config Release
 
 We welcome community contributions! Please review our **[CONTRIBUTING.md](CONTRIBUTING.md)** and **[SECURITY.md](SECURITY.md)** before submitting pull requests.
 
-- **Versioning:** Run `python3 Scripts/generate_version.py` before significant commits to sync the project versioning.
+- **Versioning:** Run `python3 cmake/generate_version.py` before significant commits to sync the project versioning.
 - **Issue Templates:** Use specialized YAML forms for **[Bug Reports](https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?template=bug_report.yml)**, **[Feature Requests](https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?template=feature_request.yml)**, and **[DSP Artifacts](https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?template=dsp_artifact.yml)**.
 - **Dependencies:** Managed automatically via **Dependabot**.
 

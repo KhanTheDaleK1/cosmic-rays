@@ -9,27 +9,27 @@
               pluginIsSynth="0" pluginWantsMidiIn="1" pluginProducesMidiOut="1"
               pluginIsMidiEffectPlugin="0" pluginEditorRequiresKeys="1" version="0.0.1">
   <MAINGROUP id="ynB3eM" name="Cosmic Rays">
-    <GROUP id="{FC038930-A9D7-C938-0A59-EF391AA5F230}" name="Source">
+    <GROUP id="{FC038930-A9D7-C938-0A59-EF391AA5F230}" name="source">
       <GROUP id="{DF9351D8-2679-09D4-5A90-361F6527294A}" name="dsp">
-        <FILE id="ALj4k3" name="BufferReaders.h" compile="0" resource="0" file="Source/dsp/BufferReaders.h"/>
+        <FILE id="ALj4k3" name="BufferReaders.h" compile="0" resource="0" file="source/dsp/BufferReaders.h"/>
       </GROUP>
       <GROUP id="{4E5B55DC-A830-060E-E045-3C438F949C7E}" name="helpers">
-        <FILE id="J38Spe" name="Helpers.h" compile="0" resource="0" file="Source/helpers/Helpers.h"/>
+        <FILE id="J38Spe" name="Helpers.h" compile="0" resource="0" file="source/helpers/Helpers.h"/>
       </GROUP>
       <FILE id="ErlAOG" name="GranularEngine.cpp" compile="1" resource="0"
-            file="Source/GranularEngine.cpp"/>
+            file="source/GranularEngine.cpp"/>
       <FILE id="lowsDh" name="GranularEngine.h" compile="0" resource="0"
-            file="Source/GranularEngine.h"/>
+            file="source/GranularEngine.h"/>
       <FILE id="QqxxqJ" name="PluginProcessor.cpp" compile="1" resource="0"
-            file="Source/PluginProcessor.cpp"/>
+            file="source/PluginProcessor.cpp"/>
       <FILE id="rE5lbx" name="PluginProcessor.h" compile="0" resource="0"
-            file="Source/PluginProcessor.h"/>
+            file="source/PluginProcessor.h"/>
       <FILE id="zFH7Tu" name="PluginEditor.cpp" compile="1" resource="0"
-            file="Source/PluginEditor.cpp"/>
-      <FILE id="OYcv4g" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
-      <FILE id="vErS1h" name="Version.h" compile="0" resource="0" file="Source/Version.h"/>
+            file="source/PluginEditor.cpp"/>
+      <FILE id="OYcv4g" name="PluginEditor.h" compile="0" resource="0" file="source/PluginEditor.h"/>
+      <FILE id="vErS1h" name="Version.h" compile="0" resource="0" file="source/Version.h"/>
     </GROUP>
-    <FILE id="LgP0nG" name="Logo.png" compile="0" resource="1" file="Logo.png"/>
+    <FILE id="LgP0nG" name="Logo.png" compile="0" resource="1" file="assets/Logo.png"/>
   </MAINGROUP>
   <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_VST3_CAN_REPLACE_VST2="0"/>
   <EXPORTFORMATS>

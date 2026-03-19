@@ -1,10 +1,11 @@
 #pragma once
 
 #include "Version.h"
-#include "PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #define ENABLE_ENHANCED_VISUALIZERS 1
+
+class CosmicRaysAudioProcessor;
 
 class CustomLookAndFeel : public juce::LookAndFeel_V4 {
 public:

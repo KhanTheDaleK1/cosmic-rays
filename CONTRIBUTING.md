@@ -25,8 +25,8 @@ Cosmic Rays is a real-time audio plugin. Performance is critical to prevent audi
 ## 3. Versioning & Releases
 
 We use a strict **Timestamp-Based Versioning** system: `dd.mm.yyyy-tttt` (Central Time).
-- **Automation:** Do not manually edit `Source/Version.h` or `version.txt`. 
-- **Trigger:** Run `python3 Scripts/generate_version.py` before committing significant changes. This script automatically:
+- **Automation:** Do not manually edit `source/Version.h` or `version.txt`. 
+- **Trigger:** Run `python3 cmake/generate_version.py` before committing significant changes. This script automatically:
   1. Updates the C++ version header.
   2. Updates the project version file.
   3. Synchronizes the version badge on the documentation website (`docs/index.html`).
