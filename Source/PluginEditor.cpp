@@ -325,13 +325,25 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
 
     addChildComponent (updateButton); updateButton.setButtonText ("UPDATE!");
     updateButton.setLookAndFeel(&customLookAndFeel);
-    updateButton.onClick = []() { juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases").launchInDefaultBrowser(); };
+    updateButton.onClick = []() { juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases/latest").launchInDefaultBrowser(); };
     
     juce::Thread::launch([this]() {
-        juce::URL url("https://raw.githubusercontent.com/KhanTheDaleK1/cosmic-rays/main/version.txt");
-        juce::String latestVersion = url.readEntireTextStream().trim();
-        if (latestVersion.isNotEmpty() && latestVersion != currentVersion) {
-            juce::MessageManager::callAsync([this]() { updateButton.setVisible(true); });
+        juce::URL url("https://api.github.com/repos/KhanTheDaleK1/cosmic-rays/releases/latest");
+        auto jsonString = url.readEntireTextStream();
+        auto json = juce::JSON::parse (jsonString);
+        
+        if (json.isObject()) {
+            auto latestTag = json["tag_name"].toString();
+            auto cleanTag = latestTag.startsWith("v") ? latestTag.substring(1) : latestTag;
+            
+            if (cleanTag.isNotEmpty() && cleanTag != currentVersion) {
+                juce::MessageManager::callAsync([this, latestTag]() { 
+                    updateButton.setVisible(true); 
+                    updateButton.onClick = [latestTag]() {
+                        juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases/tag/" + latestTag).launchInDefaultBrowser();
+                    };
+                });
+            }
         }
     });
 

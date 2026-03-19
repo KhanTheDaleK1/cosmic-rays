@@ -150,23 +150,28 @@ jobs:
     name: Sync to Gumroad
     needs: publish_release
     runs-on: ubuntu-latest
-    if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && vars.GUMROAD_PRODUCT_ID != ''
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && vars.GUMROAD_PRODUCT_ID != ''
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Upload to Gumroad
+      - name: Update Gumroad Assets
         env:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
         run: |
-          # Only sync the clean installers to Gumroad
+          # 1. List current assets on Gumroad (to potentially delete old versions)
+          # Note: Gumroad API is additive by default. To keep it clean, 
+          # we just upload the new ones with the timestamped names.
+          
           find artifacts -type f \( -name "CosmicRays-*.pkg" -o -name "CosmicRays-*.exe" -o -name "CosmicRays-*.deb" \) | while read file; do
             filename=$(basename "$file")
-            echo "Uploading $filename to Gumroad..."
-            curl -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
+            echo "Uploading $filename to Gumroad product $PRODUCT_ID..."
+            
+            # Upload new asset
+            curl -s -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/assets" \
                  -H "Authorization: Bearer $GUMROAD_TOKEN" \
                  -F "file=@$file" \
                  -F "name=$filename"

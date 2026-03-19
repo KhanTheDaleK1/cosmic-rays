@@ -491,7 +491,7 @@
     </nav>
 
     <section class="hero">
-        <div class="badge" id="release-badge">BETA 3-6-2026 AVAILABLE NOW</div>
+        <div class="badge" id="release-badge">BETA v19.03.2026-0810 AVAILABLE NOW</div>
         <h1>Sculpt Sound <br> From The Void.</h1>
         <p>A professional-grade granular processor for macOS, Linux, and Windows. Engineered for infinite sonic exploration in VST3 and LV2 environments.</p>
         <div class="cta-group">
@@ -776,12 +776,30 @@
                 
                 // Update Badge
                 if (data.tag_name) {
-                    releaseBadge.innerText = `BETA ${data.tag_name} AVAILABLE NOW`;
+                    const tag = data.tag_name.startsWith('v') ? data.tag_name : `v${data.tag_name}`;
+                    releaseBadge.innerText = `BETA ${tag} AVAILABLE NOW`;
                 }
 
-                // Note: We used to override latestDownloadUrl here, 
-                // but now we always want to point to Gumroad.
-                manualDownloadBtn.href = 'https://verygoodideas.gumroad.com/l/Cosmic-Rays';
+                // Find the right installer for the current OS
+                const OS = navigator.platform.toLowerCase();
+                let asset = null;
+                
+                if (OS.includes('mac')) {
+                    asset = data.assets.find(a => a.name.endsWith('.pkg'));
+                } else if (OS.includes('win')) {
+                    asset = data.assets.find(a => a.name.endsWith('.exe'));
+                } else if (OS.includes('linux')) {
+                    asset = data.assets.find(a => a.name.endsWith('.deb'));
+                }
+
+                // If we found a direct installer for their OS, use it. 
+                // Otherwise, fall back to Gumroad.
+                if (asset) {
+                    manualDownloadBtn.href = asset.browser_download_url;
+                    manualDownloadBtn.innerText = `Download for ${OS.includes('mac') ? 'macOS' : OS.includes('win') ? 'Windows' : 'Linux'}`;
+                } else {
+                    manualDownloadBtn.href = 'https://verygoodideas.gumroad.com/l/Cosmic-Rays';
+                }
                 
                 console.log('Latest release found:', data.tag_name);
             } catch (err) {

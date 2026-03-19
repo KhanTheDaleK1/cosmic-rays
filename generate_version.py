@@ -53,6 +53,31 @@ def update_version_txt(version_str, filepath="version.txt"):
         f.write(version_str)
     print(f"Successfully updated {filepath} to {version_str}")
 
+def update_docs_badge(version_str, filepath="docs/index.html"):
+    """
+    Updates the hardcoded version badge in the documentation index.html.
+    """
+    if not os.path.exists(filepath):
+        print(f"Warning: {filepath} not found. Skipping badge update.")
+        return
+
+    import re
+    with open(filepath, "r") as f:
+        content = f.read()
+
+    # Pattern to match the badge div with any version string
+    pattern = r'(<div class="badge" id="release-badge">BETA v).*?( AVAILABLE NOW</div>)'
+    replacement = r'\g<1>' + version_str + r'\g<2>'
+    
+    new_content = re.sub(pattern, replacement, content)
+    
+    if new_content != content:
+        with open(filepath, "w") as f:
+            f.write(new_content)
+        print(f"Successfully updated badge in {filepath} to v{version_str}")
+    else:
+        print(f"Note: No changes needed or pattern not found in {filepath}")
+
 if __name__ == "__main__":
     current_version = generate_version_string()
     print(f"Generated Version: {current_version}")
@@ -63,3 +88,6 @@ if __name__ == "__main__":
     
     # Update version.txt
     update_version_txt(current_version)
+
+    # Update docs badge
+    update_docs_badge(current_version)
