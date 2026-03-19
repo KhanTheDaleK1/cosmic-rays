@@ -138,13 +138,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: release_assets/*
-          # This creates a unique release for every single build
           name: Release ${{ env.RELEASE_VERSION }}
           tag_name: v${{ env.RELEASE_VERSION }}
-          make_latest: true
+          make_latest: false
           draft: false
           prerelease: false
           generate_release_notes: true
+
+      - name: Update Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*
+          name: Latest Beta Release
+          tag_name: latest
+          make_latest: true
+          draft: false
+          prerelease: true
+          # This ensures we don't accumulate old files in the 'latest' tag
+          fail_on_unmatched_files: false
+          append_body: false
 
   sync_to_gumroad:
     name: Sync to Gumroad
