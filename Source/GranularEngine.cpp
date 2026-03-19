@@ -367,6 +367,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
 }
 
 void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioProcessorValueTreeState& apvts) {
+    juce::ignoreUnused(apvts);
     const int numSamples = buffer.getNumSamples(); 
     const int numChannels = buffer.getNumChannels();
     
