@@ -1,0 +1,50 @@
+name: "DSP Artifact Report"
+description: "Report an audio-related issue like clicks, pops, aliasing, or mathematical instability."
+labels: ["dsp", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for reporting a DSP artifact! Audio quality is our top priority."
+  - type: input
+    id: version
+    attributes:
+      label: "Plugin Version"
+      placeholder: "e.g., 19.03.2026-0905"
+    validations:
+      required: true
+  - type: dropdown
+    id: sample_rate
+    attributes:
+      label: "Sample Rate"
+      options:
+        - 44.1 kHz
+        - 48 kHz
+        - 88.2 kHz
+        - 96 kHz
+        - 192 kHz
+    validations:
+      required: true
+  - type: textarea
+    id: artifact_description
+    attributes:
+      label: "Artifact Description"
+      placeholder: "Describe the audio glitch (e.g., 'high-frequency aliasing when modulating Pitch at max Density')."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: "Reproduction Parameters"
+      placeholder: "Please list the knob positions or attach a preset file (.xml) if possible."
+    validations:
+      required: true
+  - type: textarea
+    id: math_notes
+    attributes:
+      label: "Mathematical Rationale (Optional)"
+      placeholder: "If you have insights into why this might be happening (e.g., 'phase accumulator wrap-around error')."
+  - type: input
+    id: audio_sample
+    attributes:
+      label: "Audio Sample Link (Optional)"
+      placeholder: "Link to a Dropbox/Google Drive recording of the artifact."
