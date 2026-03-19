@@ -60,4 +60,4 @@ We welcome community contributions! Please review our **[CONTRIBUTING.md](CONTRI
 - **Dependencies:** Managed automatically via **Dependabot**.
 
 ## License
-MIT
+GPL-3.0
