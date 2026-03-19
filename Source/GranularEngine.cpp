@@ -14,7 +14,7 @@ GranularEngine::GranularEngine() : rng(std::random_device{}()), dist(0.0f, 1.0f)
 void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChannels, juce::AudioProcessorValueTreeState& apvts) {
     fs = sampleRate;
     preparedChannels = std::max(1, numChannels);
-    wetBuffer.setSize(preparedChannels, samplesPerBlock, false, false, true);
+    wetBuffer.setSize(preparedChannels, samplesPerBlock);
     wetBuffer.clear();
     
     maxDelaySamples = static_cast<int>(sampleRate * 2.0); 
@@ -31,6 +31,31 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     envFollower = 0.0f;
     transientDetected = false;
     holdLocked = false;
+
+    // Cache Parameter Pointers (Audio Thread Safe)
+    pActivity = apvts.getRawParameterValue("ACTIVITY");
+    pTime = apvts.getRawParameterValue("TIME");
+    pShape = apvts.getRawParameterValue("SHAPE");
+    pRepeats = apvts.getRawParameterValue("REPEATS");
+    pFilter = apvts.getRawParameterValue("FILTER");
+    pSpace = apvts.getRawParameterValue("SPACE");
+    pMix = apvts.getRawParameterValue("MIX");
+    pGain = apvts.getRawParameterValue("GAIN");
+    pMasterWet = apvts.getRawParameterValue("MASTER_WET_VOL");
+    pLoopLevel = apvts.getRawParameterValue("LOOP_LEVEL");
+    pSpray = apvts.getRawParameterValue("SPRAY");
+    pSpread = apvts.getRawParameterValue("SPREAD");
+    pPitchJitter = apvts.getRawParameterValue("PITCH_JITTER");
+    pRevProb = apvts.getRawParameterValue("REV_PROB");
+    pModRate = apvts.getRawParameterValue("MOD_RATE");
+    pModDepth = apvts.getRawParameterValue("MOD_DEPTH");
+    pAlgo = apvts.getRawParameterValue("ALGO");
+    pFreeze = apvts.getRawParameterValue("FREEZE");
+    pResonance = apvts.getRawParameterValue("RESONANCE");
+    
+    pLooperQuant = apvts.getRawParameterValue("LOOPER_QUANT");
+    pLooperRev = apvts.getRawParameterValue("LOOPER_REV");
+    pLooperWindowType = apvts.getRawParameterValue("WINDOW_TYPE");
 
     juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)numChannels };
 
@@ -70,15 +95,6 @@ void GranularEngine::prepare(double sampleRate, int samplesPerBlock, int numChan
     
     grains.resize(MAX_GRAINS);
     for (auto& g : grains) g.active = false;
-
-    pLooperQuant = apvts.getRawParameterValue("LOOPER_QUANT");
-    pLooperRepeats = apvts.getRawParameterValue("REPEATS");
-    pLooperSpray = apvts.getRawParameterValue("SPRAY");
-    pLooperRev = apvts.getRawParameterValue("LOOPER_REV");
-    pLooperSpread = apvts.getRawParameterValue("SPREAD");
-    pLooperPitchJitter = apvts.getRawParameterValue("PITCH_JITTER");
-    pLooperRevProb = apvts.getRawParameterValue("REV_PROB");
-    pLooperWindowType = apvts.getRawParameterValue("WINDOW_TYPE");
 }
 
 float GranularEngine::getNextSampleCubic(int channel, float readPos) {
@@ -354,33 +370,29 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     const int numSamples = buffer.getNumSamples(); 
     const int numChannels = buffer.getNumChannels();
     
-    // Ensure wetBuffer is ready without reallocating every block
-    if (wetBuffer.getNumChannels() < numChannels || wetBuffer.getNumSamples() < numSamples) {
-        wetBuffer.setSize(numChannels, numSamples, false, false, true);
-    }
     wetBuffer.clear();
 
     updateEnvelopeFollower(buffer);
     
-    // Cache Parameter Values (Atomic loads once per block)
-    const float activityVal = apvts.getRawParameterValue("ACTIVITY")->load();
-    const float timeVal = apvts.getRawParameterValue("TIME")->load();
-    const float shapeVal = apvts.getRawParameterValue("SHAPE")->load();
-    const float repeatsVal = apvts.getRawParameterValue("REPEATS")->load();
-    const float filterVal = apvts.getRawParameterValue("FILTER")->load();
-    const float spaceVal = apvts.getRawParameterValue("SPACE")->load();
-    const float mixVal = apvts.getRawParameterValue("MIX")->load();
-    const float gainVal = apvts.getRawParameterValue("GAIN")->load();
-    const float masterWet = apvts.getRawParameterValue("MASTER_WET_VOL")->load();
-    const float loopLevelVal = apvts.getRawParameterValue("LOOP_LEVEL")->load();
-    const float sprayVal = apvts.getRawParameterValue("SPRAY")->load();
-    const float spreadVal = apvts.getRawParameterValue("SPREAD")->load();
-    const float jitterVal = apvts.getRawParameterValue("PITCH_JITTER")->load();
-    const float revProbVal = apvts.getRawParameterValue("REV_PROB")->load();
-    const float modRateVal = apvts.getRawParameterValue("MOD_RATE")->load();
-    const float modDepthVal = apvts.getRawParameterValue("MOD_DEPTH")->load();
-    const int algo = (int)apvts.getRawParameterValue("ALGO")->load();
-    const bool freeze = apvts.getRawParameterValue("FREEZE")->load() > 0.5f;
+    // Cache Parameter Values (Atomic loads once per block - FAST)
+    const float activityVal = pActivity->load();
+    const float timeVal = pTime->load();
+    const float shapeVal = pShape->load();
+    const float repeatsVal = pRepeats->load();
+    const float filterVal = pFilter->load();
+    const float spaceVal = pSpace->load();
+    const float mixVal = pMix->load();
+    const float gainVal = pGain->load();
+    const float masterWet = pMasterWet->load();
+    const float loopLevelVal = pLoopLevel->load();
+    const float sprayVal = pSpray->load();
+    const float spreadVal = pSpread->load();
+    const float jitterVal = pPitchJitter->load();
+    const float revProbVal = pRevProb->load();
+    const float modRateVal_raw = pModRate->load();
+    const float modDepthVal_raw = pModDepth->load();
+    const int algo = (int)pAlgo->load();
+    const bool freeze = pFreeze->load() > 0.5f;
 
     smoothActivity.setTargetValue(activityVal);
     smoothTime.setTargetValue(timeVal);
@@ -396,8 +408,8 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     smoothSpread.setTargetValue(spreadVal);
     smoothPitchJitter.setTargetValue(jitterVal);
     smoothRevProb.setTargetValue(revProbVal);
-    smoothModRate.setTargetValue(modRateVal);
-    smoothModDepth.setTargetValue(modDepthVal);
+    smoothModRate.setTargetValue(modRateVal_raw);
+    smoothModDepth.setTargetValue(modDepthVal_raw);
 
     const GrainParams gp{
         pLooperRev->load() > 0.5f,
@@ -521,7 +533,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
     currentActiveGrainCount = alphaCount * (float)activeGrainsThisBlock + (1.0f - alphaCount) * currentActiveGrainCount;
     
     juce::dsp::AudioBlock<float> outputBlock(buffer); 
-    float resVal = apvts.getRawParameterValue("RESONANCE")->load();
+    const float resVal = pResonance->load();
     
     float cutoffFreq = 20.0f * std::pow(1000.0f, filterVal);
     auto& filter = fxChain.get<0>();

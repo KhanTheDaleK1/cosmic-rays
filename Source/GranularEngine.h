@@ -146,6 +146,30 @@ private:
     std::uniform_real_distribution<float> dist;
     double fs = 44100.0;
     int maxDelaySamples = 0, maxHoldSamples = 0;
+    // --- Audio Thread Safe Parameter Caching ---
+    std::atomic<float>* pActivity = nullptr;
+    std::atomic<float>* pTime = nullptr;
+    std::atomic<float>* pShape = nullptr;
+    std::atomic<float>* pRepeats = nullptr;
+    std::atomic<float>* pFilter = nullptr;
+    std::atomic<float>* pSpace = nullptr;
+    std::atomic<float>* pMix = nullptr;
+    std::atomic<float>* pGain = nullptr;
+    std::atomic<float>* pMasterWet = nullptr;
+    std::atomic<float>* pLoopLevel = nullptr;
+    std::atomic<float>* pSpray = nullptr;
+    std::atomic<float>* pSpread = nullptr;
+    std::atomic<float>* pPitchJitter = nullptr;
+    std::atomic<float>* pRevProb = nullptr;
+    std::atomic<float>* pModRate = nullptr;
+    std::atomic<float>* pModDepth = nullptr;
+    std::atomic<float>* pAlgo = nullptr;
+    std::atomic<float>* pFreeze = nullptr;
+    std::atomic<float>* pResonance = nullptr;
+    std::atomic<float>* pLooperQuant = nullptr;
+    std::atomic<float>* pLooperRev = nullptr;
+    std::atomic<float>* pLooperWindowType = nullptr;
+
     juce::AudioBuffer<float> wetBuffer;
     
     Helpers helpers;
