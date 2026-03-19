@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Rays | Professional Granular Processor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #050507;
+            --surface-color: rgba(255, 255, 255, 0.03);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-primary: #7b2ff7;
+            --accent-secondary: #00d4ff;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --font-main: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Animated Background */
+        .stars-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #050507 100%);
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: twinkle var(--duration) infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Navigation */
+        nav {
+            padding: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: absolute;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.5rem;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-left: 2rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .audio-toggle {
+            margin-left: 2rem;
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--accent-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .audio-toggle:hover {
+            border-color: var(--accent-secondary);
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .audio-toggle.active {
+            background: var(--accent-secondary);
+            color: var(--bg-color);
+        }
+
+        .audio-visualizer {
+            width: 12px;
+            height: 12px;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        .vis-bar {
+            width: 2px;
+            background: currentColor;
+            height: 20%;
+        }
+
+        .active .vis-bar {
+            animation: vis-grow 0.6s infinite ease-in-out alternate;
+        }
+
+        @keyframes vis-grow {
+            from { height: 20%; }
+            to { height: 100%; }
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        /* Hero Section */
+        section {
+            padding: 8rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            text-align: center;
+            padding-top: 12rem;
+            min-height: 90vh;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--surface-color);
+            border: 1px border var(--border-color);
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            color: var(--accent-secondary);
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: clamp(3rem, 8vw, 6rem);
+            font-weight: 800;
+            line-height: 0.9;
+            letter-spacing: -0.04em;
+            margin-bottom: 2rem;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 1rem 2.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: none;
+            font-family: var(--font-main);
+        }
+
+        .btn-primary {
+            background: var(--text-primary);
+            color: var(--bg-color);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary {
+            background: var(--surface-color);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Modal Styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: #0a0a0c;
+            border: 1px solid var(--border-color);
+            padding: 3rem;
+            border-radius: 24px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-header h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .email-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--accent-secondary);
+            text-transform: uppercase;
+        }
+
+        .email-form input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .email-form input:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .submit-btn {
+            background: var(--accent-primary);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background: #8b4ef8;
+            transform: translateY(-2px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .success-message h3 {
+            color: var(--accent-secondary);
+            margin-bottom: 1rem;
+        }
+
+        /* Image Mockup */
+        .mockup-container {
+            margin-top: 6rem;
+            position: relative;
+            perspective: 1000px;
+        }
+
+        .mockup {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+            transform: rotateX(5deg);
+            transition: transform 0.5s ease;
+        }
+
+        .mockup:hover {
+            transform: rotateX(0deg);
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .feature-card {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            padding: 3rem;
+            border-radius: 24px;
+            backdrop-filter: blur(20px);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-5px);
+        }
+
+        .feature-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--accent-secondary);
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Technical Specs */
+        .specs-section {
+            background: radial-gradient(circle at 100% 0%, rgba(123, 47, 247, 0.05) 0%, transparent 50%);
+        }
+
+        .specs-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .spec-item {
+            margin-bottom: 2rem;
+        }
+
+        .spec-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--accent-primary);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .spec-value {
+            font-size: 1.25rem;
+            font-weight: 500;
+        }
+
+        /* Footer */
+        footer {
+            padding: 4rem 2rem;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 3.5rem; }
+            .specs-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars-container" id="stars"></div>
+
+    <nav>
+        <div class="logo">COSMIC RAYS</div>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#specs">Specifications</a>
+            <a href="https://github.com/KhanTheDaleK1/cosmic-rays" target="_blank">GitHub</a>
+            <a href="https://github.com/KhanTheDaleK1/cosmic-rays/issues/new?title=Beta+Feedback&body=Describe+your+experience+or+report+a+bug:" target="_blank" class="btn-feedback" style="margin-left: 2rem; color: var(--accent-secondary); border: 1px solid var(--border-color); padding: 0.4rem 0.8rem; border-radius: 4px; text-decoration: none; font-size: 0.8rem;">Send Feedback</a>
+            <a href="https://beechem.site/">Back to Site</a>
+            <button id="audio-toggle" class="audio-toggle">
+                <div class="audio-visualizer">
+                    <div class="vis-bar" style="animation-delay: 0.1s"></div>
+                    <div class="vis-bar" style="animation-delay: 0.3s"></div>
+                    <div class="vis-bar" style="animation-delay: 0.2s"></div>
+                </div>
+                ATMOSPHERE: <span id="audio-status">OFF</span>
+            </button>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="badge" id="release-badge">BETA 3-6-2026 AVAILABLE NOW</div>
+        <h1>Sculpt Sound <br> From The Void.</h1>
+        <p>A professional-grade granular processor for macOS, Linux, and Windows. Engineered for infinite sonic exploration in VST3 and LV2 environments.</p>
+        <div class="cta-group">
+            <button id="download-trigger" class="btn btn-primary">Free Download</button>
+            <a href="https://github.com/KhanTheDaleK1/cosmic-rays" target="_blank" class="btn btn-secondary">View Source</a>
+            <a href="https://github.com/KhanTheDaleK1/cosmic-rays/issues" target="_blank" class="btn btn-secondary">Submit Feedback</a>
+        </div>
+
+        <div class="mockup-container">
+            <img src="https://github.com/user-attachments/assets/123c2907-87a6-497b-a2eb-ce29a7325faf" alt="Cosmic Rays UI" class="mockup">
+        </div>
+    </section>
+
+    <!-- Download Modal -->
+    <div class="modal-overlay" id="download-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">&times;</button>
+            <div id="form-container">
+                <div class="modal-header">
+                    <h2>Join the Orbit</h2>
+                    <p>Enter your email to receive the Cosmic Rays beta and future updates from the void.</p>
+                </div>
+                <form class="email-form" id="email-capture-form">
+                    <div class="input-group">
+                        <label for="email">E-mail Address</label>
+                        <input type="email" id="email" name="email" placeholder="explorer@cosmic.audio" required>
+                    </div>
+                    <button type="submit" class="submit-btn" id="submit-btn">Get Beta Access</button>
+                </form>
+            </div>
+            <div class="success-message" id="success-message">
+                <div class="modal-header">
+                    <h2>Launch Sequence Initiated</h2>
+                    <p>Your download will begin momentarily. Check your inbox for the quick-start guide.</p>
+                </div>
+                <a href="https://verygoodideas.gumroad.com/l/Cosmic-Rays" id="manual-download-btn" class="btn btn-primary" style="display: block; text-align: center;">Manual Download</a>
+            </div>
+        </div>
+    </div>
+
+    <section id="features">
+        <div style="text-align: center; margin-bottom: 4rem;">
+            <span class="spec-label">Core Engine</span>
+            <h2>Infinite Texture Engine</h2>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>Kinematic Motion</h3>
+                <p>Grains follow ballistic trajectories based on physics-modeled acceleration, delivering liquid-smooth pitch glissandos without digital artifacts.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Global Modulation</h3>
+                <p>Triple-summed prime ratio LFOs and the Broken Capstan algorithm simulate organic tape drift and nostalgic mechanical instability.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Legendary Algorithms</h3>
+                <p>11 unique processing modes including Mosaic, Seq, Glide, and Strum—inspired by legendary boutique hardware and re-imagined for the digital domain.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="specs" class="specs-section">
+        <div class="specs-grid">
+            <div>
+                <span class="spec-label">Intelligence</span>
+                <h2 style="margin-bottom: 2rem;">Built for <br> Performance.</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Cosmic Rays is optimized for low-latency live performance and heavy studio production alike. Every grain is a calculated orbit.</p>
+            </div>
+            <div class="specs-list">
+                <div class="spec-item">
+                    <span class="spec-label">DSP Architecture</span>
+                    <div class="spec-value">SIMD-Optimized Granular Synthesis</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Control Resolution</span>
+                    <div class="spec-value">64-bit Floating Point Processing</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">UI Refresh Rate</span>
+                    <div class="spec-value">GPU-Accelerated 60FPS Waveform Visualization</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Plugin Formats</span>
+                    <div class="spec-value">VST3, LV2, & AU (macOS)</div>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Platform Support</span>
+                    <div class="spec-value">Windows, macOS (Metal) & Linux (OpenGL)</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="community" style="background: linear-gradient(to bottom, transparent, rgba(123, 47, 247, 0.03)); border-top: 1px solid var(--border-color); padding: 8rem 2rem;">
+        <div style="max-width: 900px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 4rem;">
+                <span class="spec-label">Collaboration</span>
+                <h2>The Creative Collective</h2>
+                <p style="color: var(--text-secondary); margin-top: 1rem;">Great tools are rarely built in isolation. A special acknowledgement to the partners who help push digital audio forward.</p>
+            </div>
+            
+            <div class="feature-card" style="padding: 0; overflow: hidden; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(0, 212, 255, 0.1); max-width: 1000px; margin: 0 auto;">
+                <div style="width: 100%; height: 300px; overflow: hidden; position: relative; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                    <img src="collaboration.png" alt="CASA OCCIDENTE Collaboration" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.7; transition: opacity 0.5s ease;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='0.7'">
+                    <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(5, 5, 7, 0.9) 0%, transparent 60%); pointer-events: none;"></div>
+                    <div style="position: absolute; bottom: 2rem; left: 3rem;">
+                        <div style="font-family: var(--font-mono); font-size: 1.4rem; letter-spacing: 4px; color: var(--text-primary); text-shadow: 0 2px 10px rgba(0,0,0,0.5);">CASA OCCIDENTE</div>
+                    </div>
+                </div>
+                <div style="padding: 3rem 4rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 2rem;">
+                        <div style="flex: 1; min-width: 300px;">
+                            <span class="spec-label" style="color: var(--accent-secondary);">Featured Partner</span>
+                            <h3 style="margin: 0.5rem 0 1.5rem 0; font-size: 2.2rem; line-height: 1.1;">Precision Meets Chaos</h3>
+                            <p style="color: var(--text-secondary); font-size: 1.1rem; line-height: 1.8; margin-bottom: 0;">
+                                A massive thank you to the creator of <strong>RaiderPro</strong> for their invaluable technical guidance during the development of Cosmic Rays. While we explore the granular void, <strong>RaiderPro</strong> brings world-class precision to your mix through intelligent, professional-grade level automation.
+                            </p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem; padding-top: 1rem;">
+                            <a href="https://casaoccidente.com/" target="_blank" class="btn btn-primary" style="text-align: center; white-space: nowrap;">Explore RaiderPro</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2025 Evan Beechem. Research and Development Labs.</p>
+        <p style="font-size: 0.7rem; opacity: 0.5; margin-top: 1rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+            Cosmic Rays is an independent software project developed in collaboration with Casa Occidente. Except where explicitly noted, it is not affiliated with, endorsed by, or connected to any other third-party hardware manufacturers or software developers. All product names, logos, and brands are property of their respective owners. This beta software is provided "as-is" without warranty of any kind.
+        </p>
+    </footer>
+
+    <script>
+        // Generate Stars
+        const starsContainer = document.getElementById('stars');
+        const starCount = 150;
+
+        for (let i = 0; i < starCount; i++) {
+            const star = document.createElement('div');
+            star.className = 'star';
+            const size = Math.random() * 2 + 1;
+            star.style.width = `${size}px`;
+            star.style.height = `${size}px`;
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.setProperty('--duration', `${Math.random() * 3 + 2}s`);
+            star.style.animationDelay = `${Math.random() * 5}s`;
+            starsContainer.appendChild(star);
+        }
+
+        // Atmosphere Engine (Web Audio API)
+        let audioCtx = null;
+        let masterGain = null;
+        let isAudioPlaying = false;
+        const toggleBtn = document.getElementById('audio-toggle');
+        const statusText = document.getElementById('audio-status');
+
+        class Voice {
+            constructor(freq, type = 'sine') {
+                this.osc = audioCtx.createOscillator();
+                this.gain = audioCtx.createGain();
+                this.osc.type = type;
+                this.osc.frequency.value = freq;
+                this.gain.gain.value = 0;
+                this.osc.connect(this.gain);
+                this.gain.connect(masterGain);
+                this.osc.start();
+            }
+
+            play(vol, duration) {
+                const now = audioCtx.currentTime;
+                this.gain.gain.cancelScheduledValues(now);
+                this.gain.gain.linearRampToValueAtTime(vol, now + 4); // Slow bloom
+                this.gain.gain.linearRampToValueAtTime(0, now + duration); // Slow fade
+            }
+
+            stop() {
+                this.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 1);
+            }
+        }
+
+        let currentVoices = [];
+        let seqTimer = null;
+
+        // Positive Progression: A Maj9 -> D Maj9 -> E6 -> A Maj9
+        const progression = [
+            [110.00, 164.81, 220.00, 277.18, 415.30], // A Maj9
+            [146.83, 220.00, 293.66, 369.99, 440.00], // D Maj9
+            [164.81, 246.94, 329.63, 415.30, 493.88], // E6
+            [220.00, 329.63, 415.30, 554.37, 659.25]  // A Maj9 (Higher voicing)
+        ];
+
+        let currentStep = 0;
+
+        function playStep() {
+            const chord = progression[currentStep];
+            chord.forEach((freq, i) => {
+                const v = new Voice(freq, i % 2 === 0 ? 'sine' : 'triangle');
+                v.play(0.04 + (Math.random() * 0.02), 12); // Long tail
+                currentVoices.push(v);
+            });
+
+            // Cleanup old voices
+            if (currentVoices.length > 15) {
+                const old = currentVoices.splice(0, 5);
+                old.forEach(v => v.stop());
+            }
+
+            currentStep = (currentStep + 1) % progression.length;
+            seqTimer = setTimeout(playStep, 8000); // Crossfade every 8 seconds
+        }
+
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            
+            filter.type = 'lowpass';
+            filter.frequency.value = 1200; // Opened up for more positivity
+            
+            masterGain.gain.value = 0.08; 
+            masterGain.connect(filter);
+            filter.connect(audioCtx.destination);
+        }
+
+        function toggleAudio(forceState) {
+            if (!audioCtx) initAudio();
+            
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            isAudioPlaying = (forceState !== undefined) ? forceState : !isAudioPlaying;
+            
+            if (isAudioPlaying) {
+                toggleBtn.classList.add('active');
+                statusText.innerText = 'ON';
+                if (!seqTimer) playStep();
+            } else {
+                toggleBtn.classList.remove('active');
+                statusText.innerText = 'OFF';
+                clearTimeout(seqTimer);
+                seqTimer = null;
+                currentVoices.forEach(v => v.stop());
+                currentVoices = [];
+            }
+        }
+
+        // Handle manual toggle
+        toggleBtn.addEventListener('click', (e) => {
+            toggleAudio();
+        });
+
+        // Parallax Effect on Scroll
+        window.addEventListener('scroll', () => {
+            const scrolled = window.pageYOffset;
+            starsContainer.style.transform = `translateY(${scrolled * 0.5}px)`;
+        });
+
+        // Download Modal Logic
+        const modal = document.getElementById('download-modal');
+        const trigger = document.getElementById('download-trigger');
+        const closeBtn = document.getElementById('modal-close');
+        const form = document.getElementById('email-capture-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const formContainer = document.getElementById('form-container');
+        const successMessage = document.getElementById('success-message');
+        const manualDownloadBtn = document.getElementById('manual-download-btn');
+        const releaseBadge = document.getElementById('release-badge');
+
+        const WORKER_URL = 'https://cosmic-rays-backend.evan-t-beechem.workers.dev/subscribe';
+        let latestDownloadUrl = 'https://verygoodideas.gumroad.com/l/Cosmic-Rays'; // Use Gumroad as fallback
+
+        // Fetch Latest Release from GitHub
+        async function fetchLatestRelease() {
+            try {
+                const response = await fetch('https://api.github.com/repos/KhanTheDaleK1/cosmic-rays/releases/latest');
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                // Update Badge
+                if (data.tag_name) {
+                    releaseBadge.innerText = `BETA ${data.tag_name} AVAILABLE NOW`;
+                }
+
+                // Note: We used to override latestDownloadUrl here, 
+                // but now we always want to point to Gumroad.
+                manualDownloadBtn.href = 'https://verygoodideas.gumroad.com/l/Cosmic-Rays';
+                
+                console.log('Latest release found:', data.tag_name);
+            } catch (err) {
+                console.error('Failed to fetch latest release:', err);
+            }
+        }
+
+        fetchLatestRelease();
+
+        trigger.addEventListener('click', () => {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+
+        const closeModal = () => {
+            modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        const GUMROAD_URL = 'https://verygoodideas.gumroad.com/l/Cosmic-Rays';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Transmitting...';
+
+            try {
+                // Send email to backend
+                await fetch(WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, source: 'cosmic-rays' })
+                });
+
+                // Show success UI
+                formContainer.style.display = 'none';
+                successMessage.style.display = 'block';
+
+                // Redirect to Gumroad
+                window.location.href = GUMROAD_URL;
+            } catch (err) {
+                console.error('Submission failed:', err);
+                // Fallback: still show success and redirect
+                formContainer.style.display = 'none';
+                successMessage.style.display = 'block';
+                window.location.href = GUMROAD_URL;
+            }
+        });
+    </script>
+</body>
+</html>

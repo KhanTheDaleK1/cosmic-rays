@@ -1,0 +1,12 @@
+name = "cosmic-rays-backend"
+main = "cosmic-rays-backend.js"
+compatibility_date = "2024-03-13"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cosmic-rays-db"
+database_id = "260a0a66-2659-493a-b221-8f266457eb3d"
+
+[vars]
+ADMIN_API_KEY = "cr_admin_7b2ff7_!void"
+# DISCORD_WEBHOOK_URL = "your_webhook_here"
