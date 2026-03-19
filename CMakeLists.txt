@@ -25,7 +25,7 @@ CPMAddPackage(
 find_package(Python3 REQUIRED)
 set(VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/Source/Version.h")
 add_custom_target(GenerateVersion
-    COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/generate_version.py" "${VERSION_HEADER}"
+    COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/Scripts/generate_version.py" "${VERSION_HEADER}"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMENT "Updating version header"
     VERBATIM
@@ -45,7 +45,7 @@ juce_add_plugin(CosmicRays
     LV2URI "https://beechem.site/plugins/cosmic-rays"
 )
 
-juce_add_binary_data(CosmicRaysData SOURCES Logo.png)
+juce_add_binary_data(CosmicRaysData SOURCES Assets/Logo.png)
 
 target_sources(CosmicRays
     PRIVATE

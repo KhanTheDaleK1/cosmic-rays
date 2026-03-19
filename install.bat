@@ -2,7 +2,7 @@
 setlocal
 
 :: Run version generation script to ensure it's up to date
-python generate_version.py
+python Scripts/generate_version.py
 
 :: Read version from version.txt
 set /p VERSION=<version.txt
