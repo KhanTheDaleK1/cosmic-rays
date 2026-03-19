@@ -154,13 +154,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # List all assets in the 'latest' release and delete them one by one
-          # This clears out the "20 items" clutter completely.
-          assets=$(gh release view latest --json assets --jq '.assets[].name' 2>/dev/null || echo "")
-          for asset in $assets; do
-            echo "Deleting old asset: $asset"
-            gh release delete-asset latest "$asset" -y
-          done
+          # Use the GitHub CLI to list and delete ALL assets from 'latest'
+          # This ensures that we NEVER have more than 5 files total.
+          
+          echo "Fetching assets for tag 'latest'..."
+          gh release view latest --json assets --jq '.assets[].name' > assets_to_delete.txt || true
+          
+          if [ -s assets_to_delete.txt ]; then
+            while read -r asset; do
+              echo "Deleting old asset: $asset"
+              gh release delete-asset latest "$asset" -y || true
+            done < assets_to_delete.txt
+          else
+            echo "No assets found in 'latest' release."
+          fi
 
       - name: Rename for Latest
         run: |
