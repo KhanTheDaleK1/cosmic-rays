@@ -3,7 +3,7 @@
 
 version: 2
 updates:
-  # 1. GitHub Actions (Weekly updates)
+  # 1. GitHub Actions & Repository Monitoring (Weekly updates)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -12,6 +12,9 @@ updates:
       actions:
         patterns:
           - "*"
+    ignore:
+      - dependency-name: "juce-framework/JUCE"
+        update-types: ["version-update:semver-major"] # Prevent breaking changes from JUCE 9+ for now
 
   # 2. Python Dependencies (for versioning and deployment scripts)
   - package-ecosystem: "pip"
@@ -21,13 +24,3 @@ updates:
     labels:
       - "dependencies"
       - "python"
-
-  # 3. C++ / CMake via GitHub Releases (for JUCE)
-  # Since CPM.cmake pulls from GitHub, we monitor the repo directly.
-  - package-ecosystem: "github-actions" # Special use-case for repository monitoring
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    ignore:
-      - dependency-name: "juce-framework/JUCE"
-        update-types: ["version-update:semver-major"] # Prevent breaking changes from JUCE 9+ for now
