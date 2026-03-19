@@ -113,6 +113,8 @@ jobs:
     needs: build_and_package
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v8
@@ -125,10 +127,13 @@ jobs:
           git config --global user.email "bot@cosmic.audio"
 
       - name: Get Version
+        id: get_version
         run: |
           # We download the artifact to get the version.txt generated in the previous job
           find artifacts -name "version.txt" | head -n 1 | xargs cat > version.txt || echo "latest" > version.txt
-          echo "RELEASE_VERSION=$(cat version.txt)" >> $GITHUB_ENV
+          VERSION=$(cat version.txt)
+          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Flatten Artifacts
         run: |
@@ -140,9 +145,9 @@ jobs:
           
           # Rename for generic 'latest' links
           cd release_assets
-          mv CosmicRays-${{ env.RELEASE_VERSION }}-Windows.exe CosmicRays-Windows.exe || true
-          mv CosmicRays-${{ env.RELEASE_VERSION }}-Darwin.pkg CosmicRays-Darwin.pkg || true
-          mv CosmicRays-${{ env.RELEASE_VERSION }}-Linux.deb CosmicRays-Linux.deb || true
+          mv CosmicRays-$RELEASE_VERSION-Windows.exe CosmicRays-Windows.exe || true
+          mv CosmicRays-$RELEASE_VERSION-Darwin.pkg CosmicRays-Darwin.pkg || true
+          mv CosmicRays-$RELEASE_VERSION-Linux.deb CosmicRays-Linux.deb || true
           ls -R .
 
       - name: Wipe and Recreate Latest Release
@@ -154,8 +159,8 @@ jobs:
           
           # 2. Create the new clean release
           gh release create latest \
-            --title "Cosmic Rays Beta - ${{ env.RELEASE_VERSION }}" \
-            --notes "Freshly compiled on ${{ env.RELEASE_VERSION }}. Includes macOS, Windows, and Linux installers." \
+            --title "Cosmic Rays Beta - $RELEASE_VERSION" \
+            --notes "Freshly compiled on $RELEASE_VERSION. Includes macOS, Windows, and Linux installers." \
             --prerelease \
             release_assets/CosmicRays-Windows.exe \
             release_assets/CosmicRays-Darwin.pkg \
@@ -164,8 +169,8 @@ jobs:
       - name: Create Historical Version Tag
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ env.RELEASE_VERSION }}
-          tag_name: v${{ env.RELEASE_VERSION }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: v${{ steps.get_version.outputs.version }}
           make_latest: false
           draft: false
           prerelease: false
@@ -186,7 +191,7 @@ jobs:
         env:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          RELEASE_VERSION: ${{ needs.publish_release.outputs.version }}
         run: |
           # Instead of uploading (which hits a 413 error), we link directly to the GitHub Release assets.
           # This is faster and avoids size limits.
