@@ -129,56 +129,27 @@ jobs:
       - name: Get Version
         id: get_version
         run: |
-          # We download the artifact to get the version.txt generated in the previous job
           find artifacts -name "version.txt" | head -n 1 | xargs cat > version.txt || echo "latest" > version.txt
           VERSION=$(cat version.txt)
-          echo "RELEASE_VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Flatten Artifacts
+      - name: Prepare Clean Assets
         run: |
           mkdir release_assets
-          # STRICT FILTER: Only grab the actual CosmicRays installers
-          find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
-          find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
-          find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
-          
-          # Rename for generic 'latest' links
-          cd release_assets
-          mv CosmicRays-$RELEASE_VERSION-Windows.exe CosmicRays-Windows.exe || true
-          mv CosmicRays-$RELEASE_VERSION-Darwin.pkg CosmicRays-Darwin.pkg || true
-          mv CosmicRays-$RELEASE_VERSION-Linux.deb CosmicRays-Linux.deb || true
-          ls -R .
+          # Find and rename installers to generic names for the 'Latest' redirect
+          find artifacts -name "CosmicRays-*-Windows.exe" -exec cp {} release_assets/CosmicRays-Windows.exe \;
+          find artifacts -name "CosmicRays-*-Darwin.pkg" -exec cp {} release_assets/CosmicRays-Darwin.pkg \;
+          find artifacts -name "CosmicRays-*-Linux.deb" -exec cp {} release_assets/CosmicRays-Linux.deb \;
 
-      - name: Rename for Latest
-        run: |
-          cd release_assets
-          # Use the RELEASE_VERSION to find the exact files to rename
-          cp CosmicRays-${{ steps.get_version.outputs.version }}-Windows.exe CosmicRays-Windows.exe || true
-          cp CosmicRays-${{ steps.get_version.outputs.version }}-Darwin.pkg CosmicRays-Darwin.pkg || true
-          cp CosmicRays-${{ steps.get_version.outputs.version }}-Linux.deb CosmicRays-Linux.deb || true
-
-      - name: Force Update Latest Release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: "release_assets/CosmicRays-Windows.exe,release_assets/CosmicRays-Darwin.pkg,release_assets/CosmicRays-Linux.deb"
-          name: "Latest Beta Release"
-          tag: "latest"
-          body: "Freshly compiled. Includes macOS, Windows, and Linux installers."
-          allowUpdates: true
-          replacesArtifacts: true
-          makeLatest: "true"
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create Historical Version Tag
+      - name: Create Fresh Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ steps.get_version.outputs.version }}
+          files: release_assets/*
+          name: Cosmic Rays Beta ${{ steps.get_version.outputs.version }}
           tag_name: v${{ steps.get_version.outputs.version }}
-          make_latest: false
+          make_latest: true
           draft: false
-          prerelease: false
+          prerelease: true
           generate_release_notes: true
 
   sync_to_gumroad:
@@ -187,33 +158,23 @@ jobs:
     runs-on: ubuntu-latest
     if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && vars.GUMROAD_PRODUCT_ID != ''
     steps:
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-
       - name: Link GitHub Assets to Gumroad
         env:
           GUMROAD_TOKEN: ${{ secrets.GUMROAD_ACCESS_TOKEN }}
           PRODUCT_ID: ${{ vars.GUMROAD_PRODUCT_ID }}
-          RELEASE_VERSION: ${{ needs.publish_release.outputs.version }}
         run: |
-          # Instead of uploading (which hits a 413 error), we link directly to the GitHub Release assets.
-          # This is faster and avoids size limits.
+          # Official GitHub 'Latest' Redirect URLs
+          BASE_URL="https://github.com/KhanTheDaleK1/cosmic-rays/releases/latest/download"
           
-          # We'll link the three main installers
           PLATFORMS=("Windows" "Darwin" "Linux")
           EXTENSIONS=("exe" "pkg" "deb")
           
           for i in "${!PLATFORMS[@]}"; do
             PLATFORM=${PLATFORMS[$i]}
             EXT=${EXTENSIONS[$i]}
+            ASSET_URL="${BASE_URL}/CosmicRays-${PLATFORM}.${EXT}"
             
-            # Construct the exact URL for the asset in the GitHub Release
-            # Note: We use the RELEASE_VERSION gathered in the previous step
-            ASSET_URL="https://github.com/KhanTheDaleK1/cosmic-rays/releases/download/v${RELEASE_VERSION}/CosmicRays-${RELEASE_VERSION}-${PLATFORM}.${EXT}"
-            
-            echo "Linking $PLATFORM installer ($ASSET_URL) to Gumroad..."
+            echo "Linking Latest $PLATFORM installer to Gumroad..."
             
             curl -s -X POST "https://api.gumroad.com/v2/products/$PRODUCT_ID/external_files" \
                  -H "Authorization: Bearer $GUMROAD_TOKEN" \
