@@ -166,13 +166,14 @@ jobs:
           git push origin latest -f
           
           # 3. Create a brand new 'latest' release with the generic installers
+          # We use the full path to ensure the files are found
           gh release create latest \
             --title "Cosmic Rays Beta (Latest)" \
             --notes "This is the latest successful build. Version: ${{ steps.get_version.outputs.version }}" \
             --prerelease \
-            release_assets/CosmicRays-Windows.exe \
-            release_assets/CosmicRays-Darwin.pkg \
-            release_assets/CosmicRays-Linux.deb
+            "./release_assets/CosmicRays-Windows.exe" \
+            "./release_assets/CosmicRays-Darwin.pkg" \
+            "./release_assets/CosmicRays-Linux.deb"
 
   sync_to_gumroad:
     name: Sync to Gumroad
