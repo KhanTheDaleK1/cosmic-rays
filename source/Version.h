@@ -3,5 +3,18 @@
 #pragma once
 
 #ifndef PROJECT_VERSION_STRING
-#define PROJECT_VERSION_STRING "19.03.2026-1627"
+#define PROJECT_VERSION_STRING "19.03.2026-2147"
+#endif
+
+// Official JUCE Plugin Metadata
+#ifndef JucePlugin_Name
+#define JucePlugin_Name "Cosmic Rays"
+#endif
+
+#ifndef JucePlugin_VersionString
+#define JucePlugin_VersionString "19.03.2026-2147"
+#endif
+
+#ifndef JucePlugin_Manufacturer
+#define JucePlugin_Manufacturer "Beechem"
 #endif

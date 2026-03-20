@@ -21,10 +21,7 @@ CPMAddPackage(
 # --- Assets ---
 juce_add_binary_data(CosmicRaysData SOURCES assets/Logo.png)
 
-# --- Shared Code (Static Library) ---
-add_library(SharedCode STATIC)
-
-set(SHARED_SOURCES
+set(PLUGIN_SOURCES
     source/PluginProcessor.cpp
     source/PluginProcessor.h
     source/PluginEditor.cpp
@@ -35,38 +32,6 @@ set(SHARED_SOURCES
     source/dsp/BufferReaders.h
     "${VERSION_HEADER}"
 )
-
-target_sources(SharedCode PRIVATE ${SHARED_SOURCES})
-target_include_directories(SharedCode PUBLIC source)
-
-# Ensure SharedCode has access to BinaryData
-target_link_libraries(SharedCode PUBLIC CosmicRaysData)
-
-# Get Version for Definitions
-get_project_version(VERSION_STR)
-
-target_compile_definitions(SharedCode PUBLIC
-    JucePlugin_Name=\\\"Cosmic\ Rays\\\"
-    JucePlugin_VersionString=\\\"${VERSION_STR}\\\"
-    JucePlugin_Manufacturer=\\\"Beechem\\\"
-)
-
-target_link_libraries(SharedCode PUBLIC
-    juce::juce_audio_utils juce::juce_audio_processors
-    juce::juce_gui_extra juce::juce_gui_basics juce::juce_graphics
-    juce::juce_events juce::juce_core juce::juce_dsp
-    juce::juce_recommended_config_flags juce::juce_recommended_lto_flags
-)
-
-if(APPLE)
-    target_compile_definitions(SharedCode PUBLIC JUCE_METAL=1)
-elseif(UNIX)
-    target_include_directories(SharedCode PUBLIC ${GTK3_INCLUDE_DIRS})
-    target_link_libraries(SharedCode PUBLIC ${GTK3_LIBRARIES})
-    target_compile_definitions(SharedCode PUBLIC JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
-elseif(WIN32)
-    target_compile_definitions(SharedCode PUBLIC JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1)
-endif()
 
 # --- Plugin Target ---
 juce_add_plugin(CosmicRays
@@ -82,13 +47,32 @@ juce_add_plugin(CosmicRays
     LV2URI "https://beechem.site/plugins/cosmic-rays"
 )
 
-target_link_libraries(CosmicRays PRIVATE SharedCode)
+target_sources(CosmicRays PRIVATE ${PLUGIN_SOURCES})
+target_include_directories(CosmicRays PRIVATE source)
+
+target_link_libraries(CosmicRays PRIVATE
+    CosmicRaysData
+    juce::juce_audio_utils juce::juce_audio_processors
+    juce::juce_gui_extra juce::juce_gui_basics juce::juce_graphics
+    juce::juce_events juce::juce_core juce::juce_dsp
+    PUBLIC
+    juce::juce_recommended_config_flags juce::juce_recommended_lto_flags
+)
+
+if(APPLE)
+    target_compile_definitions(CosmicRays PUBLIC JUCE_METAL=1)
+elseif(UNIX)
+    target_include_directories(CosmicRays PRIVATE ${GTK3_INCLUDE_DIRS})
+    target_link_libraries(CosmicRays PRIVATE ${GTK3_LIBRARIES})
+    target_compile_definitions(CosmicRays PUBLIC JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
+elseif(WIN32)
+    target_compile_definitions(CosmicRays PUBLIC JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1)
+endif()
+
 add_dependencies(CosmicRays GenerateVersion)
 
 # --- CPack & Installation ---
-set(CPACK_PACKAGE_NAME "CosmicRays")
-set(CPACK_PACKAGE_VENDOR "Beechem")
-set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
+get_project_version(VERSION_STR)
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 

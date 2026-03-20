@@ -28,7 +28,7 @@ def generate_version_string():
 
 def write_to_header(version_str, filepath="source/Version.h"):
     """
-    Writes the generated version string to a C++ header file.
+    Writes the generated version string and plugin definitions to a C++ header file.
     """
     # Ensure directory exists
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -40,10 +40,23 @@ def write_to_header(version_str, filepath="source/Version.h"):
 #ifndef PROJECT_VERSION_STRING
 #define PROJECT_VERSION_STRING "{version_str}"
 #endif
+
+// Official JUCE Plugin Metadata
+#ifndef JucePlugin_Name
+#define JucePlugin_Name "Cosmic Rays"
+#endif
+
+#ifndef JucePlugin_VersionString
+#define JucePlugin_VersionString "{version_str}"
+#endif
+
+#ifndef JucePlugin_Manufacturer
+#define JucePlugin_Manufacturer "Beechem"
+#endif
 """
     with open(filepath, "w") as f:
         f.write(header_content)
-    print(f"Successfully wrote version {version_str} to {filepath}")
+    print(f"Successfully wrote version {version_str} and plugin metadata to {filepath}")
 
 def update_version_txt(version_str, filepath="version.txt"):
     """
