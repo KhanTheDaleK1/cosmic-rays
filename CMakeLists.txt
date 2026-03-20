@@ -29,7 +29,13 @@ file(GLOB_RECURSE SOURCES
     "source/*.h"
 )
 
-target_sources(SharedCode INTERFACE ${SOURCES} "${VERSION_HEADER}")
+# Also glob assets to ensure they are tracked
+file(GLOB_RECURSE ASSET_FILES
+    CONFIGURE_DEPENDS
+    "assets/*"
+)
+
+target_sources(SharedCode INTERFACE ${SOURCES} ${ASSET_FILES} "${VERSION_HEADER}")
 target_include_directories(SharedCode INTERFACE source)
 
 target_link_libraries(SharedCode INTERFACE
