@@ -9,10 +9,13 @@ if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0 webkit2gtk-4.1)
     
+    # Also need libcurl for version checking
+    pkg_check_modules(CURL REQUIRED libcurl)
+    
     # Function to apply linux specific settings to a target
     function(apply_linux_settings TARGET)
-        target_include_directories(${TARGET} INTERFACE ${GTK3_INCLUDE_DIRS})
-        target_link_libraries(${TARGET} INTERFACE ${GTK3_LIBRARIES})
+        target_include_directories(${TARGET} INTERFACE ${GTK3_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+        target_link_libraries(${TARGET} INTERFACE ${GTK3_LIBRARIES} ${CURL_LIBRARIES})
         target_compile_definitions(${TARGET} INTERFACE JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
     endfunction()
 endif()
