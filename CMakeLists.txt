@@ -18,25 +18,38 @@ CPMAddPackage(
     GIT_TAG 8.0.6
 )
 
+# --- Assets ---
+juce_add_binary_data(CosmicRaysData SOURCES assets/Logo.png)
+
 # --- Shared Code (Static Library) ---
-# This matches Pamplejuce pattern for testability
 add_library(SharedCode STATIC)
 
-# Automatically find all source files
-file(GLOB_RECURSE SOURCES 
-    CONFIGURE_DEPENDS 
-    "source/*.cpp" 
-    "source/*.h"
+set(SHARED_SOURCES
+    source/PluginProcessor.cpp
+    source/PluginProcessor.h
+    source/PluginEditor.cpp
+    source/PluginEditor.h
+    source/GranularEngine.cpp
+    source/GranularEngine.h
+    source/helpers/Helpers.h
+    source/dsp/BufferReaders.h
+    "${VERSION_HEADER}"
 )
 
-# Also glob assets to ensure they are tracked
-file(GLOB_RECURSE ASSET_FILES
-    CONFIGURE_DEPENDS
-    "assets/*"
-)
-
-target_sources(SharedCode PRIVATE ${SOURCES} ${ASSET_FILES} "${VERSION_HEADER}")
+target_sources(SharedCode PRIVATE ${SHARED_SOURCES})
 target_include_directories(SharedCode PUBLIC source)
+
+# Ensure SharedCode has access to BinaryData and Plugin Definitions
+target_link_libraries(SharedCode PUBLIC CosmicRaysData)
+
+# Get Version for Definitions
+get_project_version(VERSION_STR)
+
+target_compile_definitions(SharedCode PUBLIC
+    JucePlugin_Name="Cosmic Rays"
+    JucePlugin_VersionString="${VERSION_STR}"
+    JucePlugin_Manufacturer="Beechem"
+)
 
 target_link_libraries(SharedCode PUBLIC
     juce::juce_audio_utils juce::juce_audio_processors
@@ -55,9 +68,6 @@ elseif(WIN32)
     target_compile_definitions(SharedCode PUBLIC JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1)
 endif()
 
-# --- Assets ---
-juce_add_binary_data(CosmicRaysData SOURCES assets/Logo.png)
-
 # --- Plugin Target ---
 juce_add_plugin(CosmicRays
     COMPANY_NAME "Beechem"
@@ -72,14 +82,10 @@ juce_add_plugin(CosmicRays
     LV2URI "https://beechem.site/plugins/cosmic-rays"
 )
 
-# Crucial: Link SharedCode to the plugin target
-# This ensures JucePlugin_ definitions are available to SharedCode via the juce_header
-target_link_libraries(CosmicRays PRIVATE SharedCode CosmicRaysData)
+target_link_libraries(CosmicRays PRIVATE SharedCode)
 add_dependencies(CosmicRays GenerateVersion)
 
 # --- CPack & Installation ---
-get_project_version(VERSION_STR)
-
 set(CPACK_PACKAGE_NAME "CosmicRays")
 set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
@@ -94,12 +100,9 @@ if(APPLE)
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
 elseif(WIN32)
     set(CPACK_GENERATOR "INNOSETUP")
-    # For Windows, we don't want a "CosmicRays" subfolder in Common Files.
-    # We want the files placed directly into VST3 and LV2 folders within Common Files.
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Common Files")
     set(PLUGIN_DEST_VST3 "VST3")
     set(PLUGIN_DEST_LV2 "LV2")
-    # Tell Inno Setup to use the system Common Files directory as the root
     set(CPACK_INNOSETUP_INSTALL_ROOT "{commoncf}") 
 else()
     set(CPACK_GENERATOR "DEB")
