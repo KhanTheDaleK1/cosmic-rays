@@ -11,8 +11,8 @@ if(UNIX AND NOT APPLE)
     
     # Function to apply linux specific settings to a target
     function(apply_linux_settings TARGET)
-        target_include_directories(${TARGET} PRIVATE ${GTK3_INCLUDE_DIRS})
-        target_link_libraries(${TARGET} PRIVATE ${GTK3_LIBRARIES})
-        target_compile_definitions(${TARGET} PUBLIC JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
+        target_include_directories(${TARGET} INTERFACE ${GTK3_INCLUDE_DIRS})
+        target_link_libraries(${TARGET} INTERFACE ${GTK3_LIBRARIES})
+        target_compile_definitions(${TARGET} INTERFACE JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
     endfunction()
 endif()
