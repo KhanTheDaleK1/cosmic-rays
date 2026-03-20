@@ -127,7 +127,7 @@ jobs:
       - name: Build Plugin
         run: |
           if [ "${{ runner.os }}" == "Linux" ]; then
-            xvfb-run cmake --build build --config Release
+            xvfb-run -a cmake --build build --config Release
           else
             cmake --build build --config Release
           fi
