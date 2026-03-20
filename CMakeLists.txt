@@ -74,6 +74,7 @@ set(CPACK_PACKAGE_NAME "CosmicRays")
 set(CPACK_PACKAGE_VENDOR "Beechem")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
@@ -83,9 +84,13 @@ if(APPLE)
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
 elseif(WIN32)
     set(CPACK_GENERATOR "INNOSETUP")
+    # For Windows, we don't want a "CosmicRays" subfolder in Common Files.
+    # We want the files placed directly into VST3 and LV2 folders within Common Files.
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Common Files")
     set(PLUGIN_DEST_VST3 "VST3")
     set(PLUGIN_DEST_LV2 "LV2")
+    # Tell Inno Setup to use the system Common Files directory as the root
+    set(CPACK_INNOSETUP_INSTALL_ROOT "{commoncf}") 
 else()
     set(CPACK_GENERATOR "DEB")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Beechem")
