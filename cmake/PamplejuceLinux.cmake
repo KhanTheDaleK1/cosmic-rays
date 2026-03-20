@@ -7,7 +7,7 @@ if(UNIX AND NOT APPLE)
 
     # --- GTK3 & Dependencies ---
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0)
+    pkg_check_modules(GTK3 REQUIRED gtk+-x11-3.0 webkit2gtk-4.1)
     
     # Function to apply linux specific settings to a target
     function(apply_linux_settings TARGET)
