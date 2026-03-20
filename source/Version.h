@@ -3,7 +3,7 @@
 #pragma once
 
 #ifndef PROJECT_VERSION_STRING
-#define PROJECT_VERSION_STRING "19.03.2026-2147"
+#define PROJECT_VERSION_STRING "19.03.2026-2232"
 #endif
 
 // Official JUCE Plugin Metadata
@@ -12,7 +12,7 @@
 #endif
 
 #ifndef JucePlugin_VersionString
-#define JucePlugin_VersionString "19.03.2026-2147"
+#define JucePlugin_VersionString "19.03.2026-2232"
 #endif
 
 #ifndef JucePlugin_Manufacturer
