@@ -18,9 +18,9 @@ CPMAddPackage(
     GIT_TAG 8.0.6
 )
 
-# --- Shared Code (Interface Library) ---
+# --- Shared Code (Static Library) ---
 # This matches Pamplejuce pattern for testability
-add_library(SharedCode INTERFACE)
+add_library(SharedCode STATIC)
 
 # Automatically find all source files
 file(GLOB_RECURSE SOURCES 
@@ -35,10 +35,10 @@ file(GLOB_RECURSE ASSET_FILES
     "assets/*"
 )
 
-target_sources(SharedCode INTERFACE ${SOURCES} ${ASSET_FILES} "${VERSION_HEADER}")
-target_include_directories(SharedCode INTERFACE source)
+target_sources(SharedCode PRIVATE ${SOURCES} ${ASSET_FILES} "${VERSION_HEADER}")
+target_include_directories(SharedCode PUBLIC source)
 
-target_link_libraries(SharedCode INTERFACE
+target_link_libraries(SharedCode PUBLIC
     juce::juce_audio_utils juce::juce_audio_processors
     juce::juce_gui_extra juce::juce_gui_basics juce::juce_graphics
     juce::juce_events juce::juce_core juce::juce_dsp
@@ -46,11 +46,14 @@ target_link_libraries(SharedCode INTERFACE
 )
 
 if(APPLE)
-    target_compile_definitions(SharedCode INTERFACE JUCE_METAL=1)
+    target_compile_definitions(SharedCode PUBLIC JUCE_METAL=1)
 elseif(UNIX)
-    apply_linux_settings(SharedCode)
+    # We need to adapt apply_linux_settings to work with a STATIC library (using PUBLIC/PRIVATE)
+    target_include_directories(SharedCode PUBLIC ${GTK3_INCLUDE_DIRS})
+    target_link_libraries(SharedCode PUBLIC ${GTK3_LIBRARIES})
+    target_compile_definitions(SharedCode PUBLIC JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
 elseif(WIN32)
-    apply_windows_settings(SharedCode)
+    target_compile_definitions(SharedCode PUBLIC JUCE_DIRECT2D=1 JUCE_USE_DIRECTWRITE=1)
 endif()
 
 # --- Assets ---
