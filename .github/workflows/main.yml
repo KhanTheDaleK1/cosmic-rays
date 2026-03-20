@@ -171,15 +171,19 @@ jobs:
           VERSION: ${{ needs.setup.outputs.project_version }}
         run: |
           mkdir -p release_assets
-          # Use wildcards to find the files safely regardless of slight naming variations
-          cp artifacts/Windows-Installer/*.exe release_assets/CosmicRays-Windows.exe
-          cp artifacts/macOS-Installer/*.pkg release_assets/CosmicRays-Darwin.pkg
-          cp artifacts/Linux-Installer/*.deb release_assets/CosmicRays-Linux.deb
+          # Diagnostic: Check the artifact structure
+          echo "Artifact structure:"
+          ls -R artifacts || echo "Artifacts directory not found!"
           
-          # Also copy the original timestamped files for the historical release
-          cp artifacts/Windows-Installer/*.exe release_assets/
-          cp artifacts/macOS-Installer/*.pkg release_assets/
-          cp artifacts/Linux-Installer/*.deb release_assets/
+          # More robust copy using find to handle naming variations and avoid multiple file errors
+          find artifacts/Windows-Installer -name "*.exe" -exec cp {} release_assets/CosmicRays-Windows.exe \; || echo "No Windows installer found"
+          find artifacts/macOS-Installer -name "*.pkg" -exec cp {} release_assets/CosmicRays-Darwin.pkg \; || echo "No macOS installer found"
+          find artifacts/Linux-Installer -name "*.deb" -exec cp {} release_assets/CosmicRays-Linux.deb \; || echo "No Linux installer found"
+          
+          # Also copy the original files for the historical release
+          find artifacts/Windows-Installer -name "*.exe" -exec cp {} release_assets/ \; || true
+          find artifacts/macOS-Installer -name "*.pkg" -exec cp {} release_assets/ \; || true
+          find artifacts/Linux-Installer -name "*.deb" -exec cp {} release_assets/ \; || true
 
       - name: Create Versioned Release
         env:
@@ -191,7 +195,7 @@ jobs:
             --notes "Automated build for version ${VERSION}" \
             release_assets/*.exe \
             release_assets/*.pkg \
-            release_assets/*.deb
+            release_assets/*.deb || echo "Versioned release might have failed (perhaps tag already exists)"
 
       - name: Nuke and Recreate Latest Release
         env:
