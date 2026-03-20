@@ -136,44 +136,47 @@ jobs:
           VERSION=$(cat version.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Prepare Clean Assets
+      - name: Prepare and Publish Release
+        id: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get_version.outputs.version }}
         run: |
-          mkdir release_assets
-          # Find and rename installers to generic names for the 'Latest' redirect
+          # 1. Flatten and Rename Artifacts
+          mkdir -p release_assets
           find artifacts -name "CosmicRays-*-Windows.exe" -exec cp {} release_assets/CosmicRays-Windows.exe \;
           find artifacts -name "CosmicRays-*-Darwin.pkg" -exec cp {} release_assets/CosmicRays-Darwin.pkg \;
           find artifacts -name "CosmicRays-*-Linux.deb" -exec cp {} release_assets/CosmicRays-Linux.deb \;
+          
+          # Also keep timestamped versions for the historical release
+          find artifacts -name "CosmicRays-*.pkg" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.exe" -exec cp {} release_assets/ \;
+          find artifacts -name "CosmicRays-*.deb" -exec cp {} release_assets/ \;
 
-      - name: Create Fresh Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release_assets/*
-          name: Cosmic Rays Beta ${{ steps.get_version.outputs.version }}
-          tag_name: v${{ steps.get_version.outputs.version }}
-          draft: false
-          prerelease: true
-          generate_release_notes: true
+          echo "Final Assets to upload:"
+          ls -R release_assets/
 
-      - name: Force Move Latest Tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 1. Delete the old 'latest' release and its tag
+          # 2. Create the unique Versioned Release (Historical)
+          # Note: We use the timestamped files here
+          gh release create "v${VERSION}" \
+            --title "Cosmic Rays Beta ${VERSION}" \
+            --notes "Automated release for version ${VERSION}" \
+            release_assets/CosmicRays-${VERSION}-*
+
+          # 3. Nuke and Recreate the 'Latest' Release (Marketing)
+          # Note: We use the generic files here
           gh release delete latest -y --cleanup-tag || true
           
-          # 2. Re-tag the current commit as 'latest'
-          git tag -f latest
-          git push origin latest -f
+          # Wait a moment for GitHub to process the deletion
+          sleep 5
           
-          # 3. Create a brand new 'latest' release with the generic installers
-          # We use the full path to ensure the files are found
           gh release create latest \
             --title "Cosmic Rays Beta (Latest)" \
-            --notes "This is the latest successful build. Version: ${{ steps.get_version.outputs.version }}" \
+            --notes "This is the latest successful build. Version: ${VERSION}" \
             --prerelease \
-            "./release_assets/CosmicRays-Windows.exe" \
-            "./release_assets/CosmicRays-Darwin.pkg" \
-            "./release_assets/CosmicRays-Linux.deb"
+            release_assets/CosmicRays-Windows.exe \
+            release_assets/CosmicRays-Darwin.pkg \
+            release_assets/CosmicRays-Linux.deb
 
   sync_to_gumroad:
     name: Sync to Gumroad
