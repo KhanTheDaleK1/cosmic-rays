@@ -11,6 +11,12 @@ if(UNIX AND NOT APPLE)
     
     # Also need libcurl for version checking
     pkg_check_modules(CURL REQUIRED libcurl)
+
+    # Temporary Fix: Disable LTO on Linux
+    # LTO causes 'juce_lv2_helper' to segfault on some CI runners
+    set(JUCE_DSP_ENABLE_LTO OFF CACHE INTERNAL "")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
     
     # Function to apply linux specific settings to a target
     function(apply_linux_settings TARGET)
