@@ -46,9 +46,9 @@ target_link_libraries(SharedCode PUBLIC CosmicRaysData)
 get_project_version(VERSION_STR)
 
 target_compile_definitions(SharedCode PUBLIC
-    JucePlugin_Name=\"Cosmic Rays\"
-    JucePlugin_VersionString=\"${VERSION_STR}\"
-    JucePlugin_Manufacturer=\"Beechem\"
+    JucePlugin_Name=\\\"Cosmic\ Rays\\\"
+    JucePlugin_VersionString=\\\"${VERSION_STR}\\\"
+    JucePlugin_Manufacturer=\\\"Beechem\\\"
 )
 
 target_link_libraries(SharedCode PUBLIC
