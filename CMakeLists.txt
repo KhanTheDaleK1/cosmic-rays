@@ -42,8 +42,14 @@ target_include_directories(SharedCode PUBLIC source)
 # Ensure SharedCode has access to BinaryData
 target_link_libraries(SharedCode PUBLIC CosmicRaysData)
 
-# Get Version for CPack
+# Get Version for Definitions
 get_project_version(VERSION_STR)
+
+target_compile_definitions(SharedCode PUBLIC
+    JucePlugin_Name=\"Cosmic Rays\"
+    JucePlugin_VersionString=\"${VERSION_STR}\"
+    JucePlugin_Manufacturer=\"Beechem\"
+)
 
 target_link_libraries(SharedCode PUBLIC
     juce::juce_audio_utils juce::juce_audio_processors
