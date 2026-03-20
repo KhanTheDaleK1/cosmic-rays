@@ -150,10 +150,29 @@ jobs:
           files: release_assets/*
           name: Cosmic Rays Beta ${{ steps.get_version.outputs.version }}
           tag_name: v${{ steps.get_version.outputs.version }}
-          make_latest: true
           draft: false
           prerelease: true
           generate_release_notes: true
+
+      - name: Force Move Latest Tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Delete the old 'latest' release and its tag
+          gh release delete latest -y --cleanup-tag || true
+          
+          # 2. Re-tag the current commit as 'latest'
+          git tag -f latest
+          git push origin latest -f
+          
+          # 3. Create a brand new 'latest' release with the generic installers
+          gh release create latest \
+            --title "Cosmic Rays Beta (Latest)" \
+            --notes "This is the latest successful build. Version: ${{ steps.get_version.outputs.version }}" \
+            --prerelease \
+            release_assets/CosmicRays-Windows.exe \
+            release_assets/CosmicRays-Darwin.pkg \
+            release_assets/CosmicRays-Linux.deb
 
   sync_to_gumroad:
     name: Sync to Gumroad
