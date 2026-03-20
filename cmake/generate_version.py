@@ -92,8 +92,14 @@ def update_docs_badge(version_str, filepath="docs/index.html"):
         print(f"Note: No changes needed or pattern not found in {filepath}")
 
 if __name__ == "__main__":
-    current_version = generate_version_string()
-    print(f"Generated Version: {current_version}")
+    # If a version is passed as the second argument, use it.
+    # Otherwise, generate a fresh timestamp.
+    if len(sys.argv) > 2:
+        current_version = sys.argv[2]
+        print(f"Using provided Master Version: {current_version}")
+    else:
+        current_version = generate_version_string()
+        print(f"Generated Fresh Version: {current_version}")
     
     # Update Version.h
     target_path = sys.argv[1] if len(sys.argv) > 1 else "source/Version.h"

@@ -80,6 +80,14 @@ jobs:
         with:
           name: version-metadata
 
+      - name: Sync Master Version
+        env:
+          VERSION: ${{ needs.setup.outputs.project_version }}
+        run: |
+          # Force the build to use the setup version instead of generating a new one
+          python3 cmake/generate_version.py source/Version.h "${VERSION}"
+        shell: bash
+
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
@@ -157,15 +165,15 @@ jobs:
           VERSION: ${{ needs.setup.outputs.project_version }}
         run: |
           mkdir -p release_assets
-          # Clean up subfolder structure from download-artifact
-          cp artifacts/Windows-Installer/CosmicRays-${VERSION}-Windows.exe release_assets/CosmicRays-Windows.exe
-          cp artifacts/macOS-Installer/CosmicRays-${VERSION}-Darwin.pkg release_assets/CosmicRays-Darwin.pkg
-          cp artifacts/Linux-Installer/CosmicRays-${VERSION}-Linux.deb release_assets/CosmicRays-Linux.deb
+          # Use wildcards to find the files safely regardless of slight naming variations
+          cp artifacts/Windows-Installer/*.exe release_assets/CosmicRays-Windows.exe
+          cp artifacts/macOS-Installer/*.pkg release_assets/CosmicRays-Darwin.pkg
+          cp artifacts/Linux-Installer/*.deb release_assets/CosmicRays-Linux.deb
           
-          # Copy timestamped versions for the historical release
-          cp artifacts/Windows-Installer/CosmicRays-${VERSION}-Windows.exe release_assets/
-          cp artifacts/macOS-Installer/CosmicRays-${VERSION}-Darwin.pkg release_assets/
-          cp artifacts/Linux-Installer/CosmicRays-${VERSION}-Linux.deb release_assets/
+          # Also copy the original timestamped files for the historical release
+          cp artifacts/Windows-Installer/*.exe release_assets/
+          cp artifacts/macOS-Installer/*.pkg release_assets/
+          cp artifacts/Linux-Installer/*.deb release_assets/
 
       - name: Create Versioned Release
         env:
@@ -175,7 +183,9 @@ jobs:
           gh release create "v${VERSION}" \
             --title "Cosmic Rays Beta ${VERSION}" \
             --notes "Automated build for version ${VERSION}" \
-            release_assets/CosmicRays-${VERSION}-*
+            release_assets/*.exe \
+            release_assets/*.pkg \
+            release_assets/*.deb
 
       - name: Nuke and Recreate Latest Release
         env:
