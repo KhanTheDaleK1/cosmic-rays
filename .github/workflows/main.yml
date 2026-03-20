@@ -125,7 +125,13 @@ jobs:
         shell: bash
 
       - name: Build Plugin
-        run: cmake --build build --config Release
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            xvfb-run cmake --build build --config Release
+          else
+            cmake --build build --config Release
+          fi
+        shell: bash
 
       - name: Package with CPack
         run: |
