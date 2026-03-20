@@ -48,7 +48,6 @@ target_link_libraries(SharedCode PUBLIC
 if(APPLE)
     target_compile_definitions(SharedCode PUBLIC JUCE_METAL=1)
 elseif(UNIX)
-    # We need to adapt apply_linux_settings to work with a STATIC library (using PUBLIC/PRIVATE)
     target_include_directories(SharedCode PUBLIC ${GTK3_INCLUDE_DIRS})
     target_link_libraries(SharedCode PUBLIC ${GTK3_LIBRARIES})
     target_compile_definitions(SharedCode PUBLIC JUCE_USE_XSHM=1 JUCE_USE_XRENDER=1)
@@ -73,6 +72,8 @@ juce_add_plugin(CosmicRays
     LV2URI "https://beechem.site/plugins/cosmic-rays"
 )
 
+# Crucial: Link SharedCode to the plugin target
+# This ensures JucePlugin_ definitions are available to SharedCode via the juce_header
 target_link_libraries(CosmicRays PRIVATE SharedCode CosmicRaysData)
 add_dependencies(CosmicRays GenerateVersion)
 
