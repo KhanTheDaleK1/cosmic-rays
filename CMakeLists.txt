@@ -73,9 +73,28 @@ add_dependencies(CosmicRays GenerateVersion)
 # --- CPack & Installation ---
 get_project_version(VERSION_STR)
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VENDOR "Beechem")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Professional Granular Audio Processor")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+
+# --- Component-Based Installation ---
+# This allows users to select only the formats they need (AU, VST3, LV2)
+set(CPACK_MONOLITHIC_INSTALL OFF)
+set(CPACK_COMPONENT_VST3_DISPLAY_NAME "VST3 Plugin")
+set(CPACK_COMPONENT_AU_DISPLAY_NAME "Audio Unit (AU) Plugin")
+set(CPACK_COMPONENT_LV2_DISPLAY_NAME "LV2 Plugin")
+
+set(CPACK_COMPONENT_VST3_DESCRIPTION "Recommended for Ableton, Cubase, Studio One, and FL Studio.")
+set(CPACK_COMPONENT_AU_DESCRIPTION "Required for Logic Pro and GarageBand.")
+set(CPACK_COMPONENT_LV2_DESCRIPTION "Used by experimental DAWs and niche macOS workflows.")
+
+set(CPACK_COMPONENT_VST3_GROUP "Plugins")
+set(CPACK_COMPONENT_AU_GROUP "Plugins")
+set(CPACK_COMPONENT_LV2_GROUP "Plugins")
+set(CPACK_COMPONENT_GROUP_PLUGINS_DISPLAY_NAME "Plugin Formats")
+set(CPACK_COMPONENT_GROUP_PLUGINS_DESCRIPTION "Select the formats you wish to install on your system.")
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
@@ -83,6 +102,8 @@ if(APPLE)
     set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
     set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
+    # This enables the "Customize" button in the macOS installer UI
+    set(CPACK_PRODUCTBUILD_COMPONENT_INSTALL ON)
 elseif(WIN32)
     set(CPACK_GENERATOR "INNOSETUP")
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "CosmicRays")
