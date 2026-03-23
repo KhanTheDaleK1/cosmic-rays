@@ -11,6 +11,10 @@ include(PamplejuceVersioning)
 include(PamplejuceLinux)
 include(PamplejuceWindows)
 
+# --- JUCE Build Options (Must be set BEFORE CPMAddPackage) ---
+set(JUCE_INSTALL_DESTINATION "share/juce" CACHE STRING "" FORCE)
+set(JUCE_COPY_PLUGIN_AFTER_BUILD OFF CACHE BOOL "" FORCE)
+
 # --- Dependencies ---
 CPMAddPackage(
     NAME juce
@@ -122,22 +126,36 @@ elseif(WIN32)
     set(CPACK_PACKAGE_VERSION_MAJOR "1")
     set(CPACK_PACKAGE_VERSION_MINOR "0")
     set(CPACK_PACKAGE_VERSION_PATCH "0")
+    # This ensures the 'Select Components' page appears in Inno Setup
+    set(CPACK_INNOSETUP_COMPONENT_INSTALL ON)
 else()
     set(CPACK_GENERATOR "DEB")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Very Good")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
     set(PLUGIN_DEST_VST3 "lib/vst3")
     set(PLUGIN_DEST_LV2 "lib/lv2")
+    # Generates separate .deb files for each component (Standard Linux selection)
+    set(CPACK_DEBIAN_COMPONENT_INSTALL ON)
 endif()
 
 if(TARGET CosmicRays_VST3)
-    install(TARGETS CosmicRays_VST3 DESTINATION "${PLUGIN_DEST_VST3}" COMPONENT VST3)
+    install(TARGETS CosmicRays_VST3 DESTINATION "${PLUGIN_DEST_VST3}" COMPONENT VST3 EXCLUDE_FROM_ALL)
 endif()
 if(TARGET CosmicRays_AU)
-    install(TARGETS CosmicRays_AU DESTINATION "${PLUGIN_DEST_AU}" COMPONENT AU)
+    install(TARGETS CosmicRays_AU DESTINATION "${PLUGIN_DEST_AU}" COMPONENT AU EXCLUDE_FROM_ALL)
 endif()
 if(TARGET CosmicRays_LV2)
-    install(TARGETS CosmicRays_LV2 DESTINATION "${PLUGIN_DEST_LV2}" COMPONENT LV2)
+    install(TARGETS CosmicRays_LV2 DESTINATION "${PLUGIN_DEST_LV2}" COMPONENT LV2 EXCLUDE_FROM_ALL)
 endif()
+
+# This prevents JUCE from installing its own shared code libraries and development headers
+set_target_properties(CosmicRays PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# --- CPack Component Filtering ---
+# This ensures that ONLY our explicitly defined components (AU, VST3, LV2) are packaged.
+# It hides and excludes the 'Unspecified' component where dev files usually leak.
+set(CPACK_COMPONENTS_ALL AU VST3 LV2)
+set(CPACK_COMPONENT_UNSPECIFIED_HIDDEN ON)
+set(CPACK_COMPONENT_UNSPECIFIED_REQUIRED OFF)
 
 include(CPack)
