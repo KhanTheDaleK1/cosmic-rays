@@ -51,7 +51,7 @@ def write_to_header(version_str, filepath="source/Version.h"):
 #endif
 
 #ifndef JucePlugin_Manufacturer
-#define JucePlugin_Manufacturer "Beechem"
+#define JucePlugin_Manufacturer "Very Good"
 #endif
 """
     with open(filepath, "w") as f:

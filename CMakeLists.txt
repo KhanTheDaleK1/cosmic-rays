@@ -35,16 +35,16 @@ set(PLUGIN_SOURCES
 
 # --- Plugin Target ---
 juce_add_plugin(CosmicRays
-    COMPANY_NAME "Beechem"
+    COMPANY_NAME "Very Good"
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT TRUE
     IS_MIDI_EFFECT FALSE
-    PLUGIN_MANUFACTURER_CODE "BEEH"
+    PLUGIN_MANUFACTURER_CODE "VGYI"
     PLUGIN_CODE "COSR"
     FORMATS AU VST3 LV2
     PRODUCT_NAME "Cosmic Rays"
-    LV2URI "https://beechem.site/plugins/cosmic-rays"
+    LV2URI "https://beechem.site/cosmic-rays"
 )
 
 target_sources(CosmicRays PRIVATE ${PLUGIN_SOURCES})
@@ -73,7 +73,7 @@ add_dependencies(CosmicRays GenerateVersion)
 # --- CPack & Installation ---
 get_project_version(VERSION_STR)
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
-set(CPACK_PACKAGE_VENDOR "Beechem")
+set(CPACK_PACKAGE_VENDOR "Very Good")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Professional Granular Audio Processor")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
@@ -115,7 +115,7 @@ elseif(WIN32)
     set(CPACK_PACKAGE_VERSION_PATCH "0")
 else()
     set(CPACK_GENERATOR "DEB")
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Beechem")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Very Good")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
     set(PLUGIN_DEST_VST3 "lib/vst3")
     set(PLUGIN_DEST_LV2 "lib/lv2")

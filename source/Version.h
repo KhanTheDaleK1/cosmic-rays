@@ -16,5 +16,5 @@
 #endif
 
 #ifndef JucePlugin_Manufacturer
-#define JucePlugin_Manufacturer "Beechem"
+#define JucePlugin_Manufacturer "Very Good"
 #endif
