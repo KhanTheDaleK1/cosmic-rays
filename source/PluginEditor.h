@@ -75,6 +75,27 @@ private:
     juce::TextEditor textEditor;
 };
 
+class UpdateOverlayComponent : public juce::Component, public juce::Thread {
+public:
+    UpdateOverlayComponent();
+    ~UpdateOverlayComponent() override;
+
+    void paint(juce::Graphics& g) override;
+    void resized() override;
+    void setLatestVersion(const juce::String& version);
+    void run() override;
+
+private:
+    void archiveCurrentVersion();
+
+    juce::Label titleLabel;
+    juce::Label statusLabel;
+    juce::TextButton installButton;
+    juce::TextButton cancelButton;
+    juce::ToggleButton keepOldButton;
+    juce::String downloadUrl;
+    juce::String newVersionTag;
+};
 
 // ... other includes if they were there ...
 
@@ -102,6 +123,7 @@ private:
     DensityMeter densityMeter;
     WaveformVisualizer waveformVis;
     HelpComponent helpOverlay;
+    UpdateOverlayComponent updateOverlay;
 
     juce::Slider activitySlider, repeatsSlider, filterSlider, spaceSlider, mixSlider, loopLevelSlider, gainSlider;
     juce::Slider modRateSlider, modDepthSlider, spraySlider, spreadSlider;

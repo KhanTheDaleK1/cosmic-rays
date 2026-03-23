@@ -44,6 +44,7 @@ juce_add_plugin(CosmicRays
     PLUGIN_CODE "COSR"
     FORMATS AU VST3 LV2
     PRODUCT_NAME "Cosmic Rays"
+    BUNDLE_ID "com.verygood.cosmicrays"
     LV2URI "https://beechem.site/cosmic-rays"
 )
 
@@ -78,6 +79,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Professional Granular Audio Processor")
 set(CPACK_PACKAGE_VERSION "${VERSION_STR}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README_Installer.txt")
 
 # --- Component-Based Installation ---
 # This allows users to select only the formats they need (AU, VST3, LV2)
@@ -98,7 +100,7 @@ set(CPACK_COMPONENT_GROUP_PLUGINS_DESCRIPTION "Select the formats you wish to in
 
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
-    set(CPACK_PACKAGING_INSTALL_PREFIX "") 
+    set(CPACK_PACKAGING_INSTALL_PREFIX "/") 
     set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
     set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
     set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")

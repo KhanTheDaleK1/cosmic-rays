@@ -201,6 +201,123 @@ void HelpComponent::paint(juce::Graphics& g) {
 
 void HelpComponent::resized() { textEditor.setBounds(getLocalBounds().reduced(20)); }
 
+UpdateOverlayComponent::UpdateOverlayComponent() : juce::Thread("UpdaterThread") {
+    addAndMakeVisible(titleLabel);
+    titleLabel.setFont(juce::FontOptions("Courier", 18.0f, juce::Font::bold));
+    titleLabel.setColour(juce::Label::textColourId, CustomLookAndFeel::Colors::phosphorGreen);
+    titleLabel.setJustificationType(juce::Justification::centred);
+
+    addAndMakeVisible(statusLabel);
+    statusLabel.setFont(juce::FontOptions("Courier", 12.0f, juce::Font::plain));
+    statusLabel.setColour(juce::Label::textColourId, CustomLookAndFeel::Colors::phosphorGreen);
+    statusLabel.setJustificationType(juce::Justification::centred);
+
+    addAndMakeVisible(keepOldButton);
+    keepOldButton.setButtonText("Archive current version to Desktop");
+    keepOldButton.setColour(juce::ToggleButton::textColourId, CustomLookAndFeel::Colors::phosphorGreen);
+    keepOldButton.setColour(juce::ToggleButton::tickColourId, CustomLookAndFeel::Colors::phosphorGreen);
+    keepOldButton.setColour(juce::ToggleButton::tickDisabledColourId, CustomLookAndFeel::Colors::phosphorGreen.withAlpha(0.3f));
+    keepOldButton.setToggleState(false, juce::dontSendNotification);
+
+    addAndMakeVisible(installButton);
+    installButton.setButtonText("DOWNLOAD & INSTALL");
+    installButton.onClick = [this]() {
+        installButton.setEnabled(false);
+        statusLabel.setText("Downloading...", juce::dontSendNotification);
+        startThread();
+    };
+
+    addAndMakeVisible(cancelButton);
+    cancelButton.setButtonText("CANCEL");
+    cancelButton.onClick = [this]() { setVisible(false); };
+}
+
+UpdateOverlayComponent::~UpdateOverlayComponent() {
+    stopThread(2000);
+}
+
+void UpdateOverlayComponent::setLatestVersion(const juce::String& version) {
+    newVersionTag = version;
+    titleLabel.setText("UPDATE AVAILABLE: v" + version, juce::dontSendNotification);
+    statusLabel.setText("Ready to download.", juce::dontSendNotification);
+    installButton.setEnabled(true);
+    
+#if JUCE_MAC
+    juce::String assetName = "CosmicRays-Darwin.pkg";
+#elif JUCE_WINDOWS
+    juce::String assetName = "CosmicRays-Windows.exe";
+#else
+    juce::String assetName = "CosmicRays-Linux.deb";
+#endif
+
+    downloadUrl = "https://github.com/KhanTheDaleK1/cosmic-rays/releases/latest/download/" + assetName;
+}
+
+void UpdateOverlayComponent::paint(juce::Graphics& g) {
+    g.setColour(juce::Colours::black.withAlpha(0.95f));
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), 10.0f);
+    g.setColour(CustomLookAndFeel::Colors::phosphorGreen);
+    g.drawRoundedRectangle(getLocalBounds().toFloat(), 10.0f, 2.0f);
+}
+
+void UpdateOverlayComponent::resized() {
+    auto bounds = getLocalBounds().reduced(20);
+    titleLabel.setBounds(bounds.removeFromTop(40));
+    statusLabel.setBounds(bounds.removeFromTop(30));
+    bounds.removeFromTop(10);
+    keepOldButton.setBounds(bounds.removeFromTop(30));
+    bounds.removeFromTop(20);
+    
+    auto buttonRow = bounds.removeFromTop(40);
+    installButton.setBounds(buttonRow.removeFromLeft(bounds.getWidth() / 2).reduced(5));
+    cancelButton.setBounds(buttonRow.reduced(5));
+}
+
+void UpdateOverlayComponent::archiveCurrentVersion() {
+    juce::File currentFile = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    while (currentFile.getParentDirectory() != currentFile) {
+        if (currentFile.hasFileExtension("vst3") || currentFile.hasFileExtension("component") || currentFile.hasFileExtension("lv2")) {
+            break;
+        }
+        currentFile = currentFile.getParentDirectory();
+    }
+    
+    if (currentFile.exists()) {
+        juce::File desktop = juce::File::getSpecialLocation(juce::File::userDesktopDirectory);
+        juce::String timeStr = juce::Time::getCurrentTime().formatted("%Y%m%d_%H%M");
+        juce::File archiveDir = desktop.getChildFile("CosmicRays_Archive_" + timeStr);
+        archiveDir.createDirectory();
+        currentFile.copyDirectoryTo(archiveDir.getChildFile(currentFile.getFileName()));
+    }
+}
+
+void UpdateOverlayComponent::run() {
+    if (keepOldButton.getToggleState()) {
+        archiveCurrentVersion();
+    }
+
+    juce::URL url(downloadUrl);
+    juce::File tempFile = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(url.getFileName());
+
+    std::unique_ptr<juce::InputStream> stream(url.createInputStream(false, nullptr, nullptr, {}, 10000, nullptr));
+    if (stream != nullptr) {
+        juce::FileOutputStream out(tempFile);
+        out.setPosition(0);
+        out.truncate();
+        out.writeFromInputStream(*stream, -1);
+
+        juce::MessageManager::callAsync([this, tempFile]() {
+            statusLabel.setText("Launching Installer...", juce::dontSendNotification);
+            tempFile.startAsProcess();
+        });
+    } else {
+        juce::MessageManager::callAsync([this]() {
+            statusLabel.setText("Download Failed!", juce::dontSendNotification);
+            installButton.setEnabled(true);
+        });
+    }
+}
+
 /**
  * Creates the high-performance orange-peel texture.
  */
@@ -232,7 +349,7 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
 {
     addAndMakeVisible(audioProcessor.visualiser);
     audioProcessor.visualiser.setColours(CustomLookAndFeel::Colors::scopeBg, CustomLookAndFeel::Colors::phosphorGreen.withAlpha(0.7f));
-    addAndMakeVisible(filterVis); addAndMakeVisible(pitchVis); addAndMakeVisible(densityMeter); addAndMakeVisible(waveformVis); addChildComponent(helpOverlay);
+    addAndMakeVisible(filterVis); addAndMakeVisible(pitchVis); addAndMakeVisible(densityMeter); addAndMakeVisible(waveformVis); addChildComponent(helpOverlay); addChildComponent(updateOverlay);
 
     auto setupVisLabel = [&](juce::Label& l, const juce::String& text) {
         addAndMakeVisible(l);
@@ -337,10 +454,12 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
             auto cleanTag = latestTag.startsWith("v") ? latestTag.substring(1) : latestTag;
             
             if (cleanTag.isNotEmpty() && cleanTag != currentVersion) {
-                juce::MessageManager::callAsync([this, latestTag]() { 
+                juce::MessageManager::callAsync([this, cleanTag]() { 
                     updateButton.setVisible(true); 
-                    updateButton.onClick = [latestTag]() {
-                        juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases/tag/" + latestTag).launchInDefaultBrowser();
+                    updateButton.onClick = [this, cleanTag]() {
+                        updateOverlay.setLatestVersion(cleanTag);
+                        updateOverlay.setVisible(true);
+                        updateOverlay.toFront(true);
                     };
                 });
             }
@@ -1149,4 +1268,5 @@ void CosmicRaysAudioProcessorEditor::resized() {
     trailsButton.setBounds (globalRow.removeFromLeft(90));
 
     helpOverlay.setBounds(getLocalBounds().reduced(40, 60));
+    updateOverlay.setBounds(getLocalBounds().reduced(100, 150));
 }
