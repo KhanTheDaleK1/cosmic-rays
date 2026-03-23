@@ -239,7 +239,7 @@ UpdateOverlayComponent::~UpdateOverlayComponent() {
 void UpdateOverlayComponent::setLatestVersion(const juce::String& version) {
     newVersionTag = version;
     titleLabel.setText("UPDATE AVAILABLE: v" + version, juce::dontSendNotification);
-    statusLabel.setText("Ready to download.", juce::dontSendNotification);
+    statusLabel.setText("Instructions: Once the installer finishes,\nRELAUNCH YOUR DAW to see the changes.", juce::dontSendNotification);
     installButton.setEnabled(true);
     
 #if JUCE_MAC
@@ -263,7 +263,7 @@ void UpdateOverlayComponent::paint(juce::Graphics& g) {
 void UpdateOverlayComponent::resized() {
     auto bounds = getLocalBounds().reduced(20);
     titleLabel.setBounds(bounds.removeFromTop(40));
-    statusLabel.setBounds(bounds.removeFromTop(30));
+    statusLabel.setBounds(bounds.removeFromTop(60));
     bounds.removeFromTop(10);
     keepOldButton.setBounds(bounds.removeFromTop(30));
     bounds.removeFromTop(20);
@@ -307,7 +307,7 @@ void UpdateOverlayComponent::run() {
         out.writeFromInputStream(*stream, -1);
 
         juce::MessageManager::callAsync([this, tempFile]() {
-            statusLabel.setText("Launching Installer...", juce::dontSendNotification);
+            statusLabel.setText("Launching... RELAUNCH DAW AFTER INSTALL!", juce::dontSendNotification);
             tempFile.startAsProcess();
         });
     } else {
@@ -442,7 +442,6 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
 
     addChildComponent (updateButton); updateButton.setButtonText ("UPDATE!");
     updateButton.setLookAndFeel(&customLookAndFeel);
-    updateButton.onClick = []() { juce::URL("https://github.com/KhanTheDaleK1/cosmic-rays/releases/latest").launchInDefaultBrowser(); };
     
     juce::Thread::launch([this]() {
         juce::URL url("https://api.github.com/repos/KhanTheDaleK1/cosmic-rays/releases/latest");
@@ -453,7 +452,17 @@ CosmicRaysAudioProcessorEditor::CosmicRaysAudioProcessorEditor (CosmicRaysAudioP
             auto latestTag = json["tag_name"].toString();
             auto cleanTag = latestTag.startsWith("v") ? latestTag.substring(1) : latestTag;
             
-            if (cleanTag.isNotEmpty() && cleanTag != currentVersion) {
+            // --- Robust Version Comparison ---
+            // Compares timestamps formatted as dd.mm.yyyy-tttt
+            auto parseVersion = [](const juce::String& v) -> int64_t {
+                auto parts = juce::StringArray::fromTokens(v.replace("-", "."), ".", "");
+                if (parts.size() < 4) return 0;
+                // Rearrange to yyyymmddtttt for linear integer comparison
+                juce::String linear = parts[2] + parts[1] + parts[0] + parts[3];
+                return linear.getLargeIntValue();
+            };
+
+            if (cleanTag.isNotEmpty() && parseVersion(cleanTag) > parseVersion(currentVersion)) {
                 juce::MessageManager::callAsync([this, cleanTag]() { 
                     updateButton.setVisible(true); 
                     updateButton.onClick = [this, cleanTag]() {
