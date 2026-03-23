@@ -101,9 +101,9 @@ set(CPACK_COMPONENT_GROUP_PLUGINS_DESCRIPTION "Select the formats you wish to in
 if(APPLE)
     set(CPACK_GENERATOR "productbuild")
     set(CPACK_PACKAGING_INSTALL_PREFIX "/") 
-    set(PLUGIN_DEST_VST3 "Library/Audio/Plug-Ins/VST3")
-    set(PLUGIN_DEST_AU "Library/Audio/Plug-Ins/Components")
-    set(PLUGIN_DEST_LV2 "Library/Audio/Plug-Ins/LV2")
+    set(PLUGIN_DEST_VST3 "/Library/Audio/Plug-Ins/VST3")
+    set(PLUGIN_DEST_AU "/Library/Audio/Plug-Ins/Components")
+    set(PLUGIN_DEST_LV2 "/Library/Audio/Plug-Ins/LV2")
     # This enables the "Customize" button in the macOS installer UI
     set(CPACK_PRODUCTBUILD_COMPONENT_INSTALL ON)
 elseif(WIN32)
