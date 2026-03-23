@@ -18,11 +18,11 @@ jobs:
   # 1. SETUP JOB: Generate the version once and share it with everyone
   setup:
     name: Setup & Versioning
-    # Run only on every 10th push to main, OR if manually triggered, OR if a version tag is pushed.
+    # Run on pushes to main/master, manual triggers, or version tags.
     if: |
       github.event_name == 'workflow_dispatch' || 
       startsWith(github.ref, 'refs/tags/') ||
-      (github.event_name == 'push' && github.run_number % 10 == 0)
+      github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       project_version: ${{ steps.versioning.outputs.version }}
