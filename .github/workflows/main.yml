@@ -28,10 +28,10 @@ jobs:
       project_version: ${{ steps.versioning.outputs.version }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -47,7 +47,7 @@ jobs:
           echo "Generated Master Version: $VERSION"
 
       - name: Upload Version Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: version-metadata
           path: |
@@ -76,12 +76,12 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
       - name: Download Version Metadata
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: version-metadata
 
@@ -144,7 +144,7 @@ jobs:
           cpack -C Release
 
       - name: Upload Native Installer Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: build/*.${{ matrix.package_extension }}
@@ -159,10 +159,10 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
