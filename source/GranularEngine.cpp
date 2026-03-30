@@ -1,7 +1,7 @@
 /**
- * COSMIC RAYS - Granular Engine Implementation (Definitive Stability Fix)
+ * COSMIC RAYS - Granular Engine
  * ---------------------------------------------------------------------
- * Robust granular synthesis with proper feedback path and direction logic.
+ * Granular synthesis with proper feedback path and direction logic.
  */
 
 #include "GranularEngine.h"
@@ -209,7 +209,7 @@ void GranularEngine::scheduleGrains(float activity, float timeMs, float shape, i
             g.targetVelocity = g.velocity;
         }
         else if (algo == 2) {
-            // Glide: Ballistic Pitch Trajectory (Expert Physics)
+            // Glide: Ballistic Pitch Trajectory 
             g.length = lenBase * (1.0f + repeats * 8.0f);
             g.velocity = 1.0f;
             if (mode == 0)      g.targetVelocity = 0.5f; 
@@ -479,7 +479,7 @@ void GranularEngine::processBlock(juce::AudioBuffer<float>& buffer, juce::AudioP
 
             activeGrainsThisSample++;
             
-            // --- KINEMATIC INTEGRATOR (Expert Phase Accuracy) ---
+            // --- KINEMATIC INTEGRATOR (Phase Accuracy) ---
             g.velocity += g.acceleration; 
             g.currentSpeed = g.velocity;
             g.currentPos += g.reverse ? -g.velocity : g.velocity;
